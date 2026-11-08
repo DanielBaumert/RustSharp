@@ -60,6 +60,18 @@ python3 tests/run.py
 python3 tests/run.py --asan
 ```
 
+### Docker
+
+The image builds the compiler and brings `clang`, so nothing else is needed on the host:
+
+```bash
+git clone --recurse-submodules https://github.com/DanielBaumert/RustSharp.git
+cd RustSharp
+docker build -t rustsharp .
+docker run --rm -v "$PWD":/work -w /work rustsharp examples/demo.rscs -o demo
+./demo
+```
+
 The compiler supports `-O0` through `-O3`, `--check`, `--asan`, `--tsan`,
 `--emit-llvm <file>`, `--emit-mir <file>`, `--no-borrowck`, and
 `--corelib <directory>`.

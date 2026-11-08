@@ -1,0 +1,10 @@
+# Build output and editor files never go into the image.
+**/artifacts/
+**/bin/
+**/obj/
+.vscode/
+editors/
+bench/
+docs/
+*.vsix
+*.ll
