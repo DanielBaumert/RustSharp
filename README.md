@@ -41,16 +41,35 @@ released deterministically when their owner leaves scope.
 
 ## Quick start
 
-Requirements: .NET SDK 10.0.1xx, the .NET 9 runtime, and `clang` on `PATH`. The compiler is a fork of
-Roslyn, kept as the submodule `roslyn` (branch `rustsharp` of
-[DanielBaumert/roslyn](https://github.com/DanielBaumert/roslyn)).
+The compiler is a fork of Roslyn, kept as the submodule `roslyn` (branch `rustsharp` of
+[DanielBaumert/roslyn](https://github.com/DanielBaumert/roslyn)). Building it produces one
+self-contained executable, `./rustsharp`, which needs no installed .NET and finds the core library in
+`corelib/` next to itself. Compiled programs are linked by `clang`, which must be on `PATH`.
+
+### Build with Docker
 
 ```bash
 git clone --recurse-submodules https://github.com/DanielBaumert/RustSharp.git
 cd RustSharp
-tools/build.sh Release
+docker build --target export --output . .   # writes ./rustsharp
 ./rustsharp examples/demo.rscs -o demo
 ./demo
+```
+
+Or use the whole toolchain from an image, with `clang` included:
+
+```bash
+docker build -t rustsharp .
+docker run --rm -v "$PWD":/work -w /work rustsharp examples/demo.rscs -o demo
+./demo
+```
+
+### Build without Docker
+
+Requirements: the .NET SDK pinned in `roslyn/global.json` (10.0.1xx) and `clang`.
+
+```bash
+tools/build.sh                              # writes ./rustsharp
 
 # Check ownership and borrowing without producing a binary
 ./rustsharp examples/errors.rscs --check
@@ -58,18 +77,6 @@ tools/build.sh Release
 # Run the test suite
 python3 tests/run.py
 python3 tests/run.py --asan
-```
-
-### Docker
-
-The image builds the compiler and brings `clang`, so nothing else is needed on the host:
-
-```bash
-git clone --recurse-submodules https://github.com/DanielBaumert/RustSharp.git
-cd RustSharp
-docker build -t rustsharp .
-docker run --rm -v "$PWD":/work -w /work rustsharp examples/demo.rscs -o demo
-./demo
 ```
 
 The compiler supports `-O0` through `-O3`, `--check`, `--asan`, `--tsan`,
