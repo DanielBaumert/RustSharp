@@ -1,0 +1,42 @@
+// A lambda may return a borrow of its captures or of the data behind its arguments; every caller of a
+// delegate binds the result to all inputs, the delegate included. These uses must still be rejected.
+using System;
+using System.Collections.Generic;
+[Mut] delegate Ref<int> Bump();
+delegate Ref<int> Id(Ref<int> x);
+delegate Ref<int> Get();
+class P
+{
+    static void FnMutTwice()
+    {
+        mut int counter = 0;
+        mut Bump f = () => { counter++; return Ref<int>.Of(in counter); };
+        var a = f();
+        var b = f(); // error: CS9911
+        Console.WriteLine(a.Value + b.Value);
+    }
+
+    static void OutlivesArgument()
+    {
+        Id id = x => x;
+        mut Option<Ref<int>> keep = None;
+        {
+            int y = 1;
+            keep = Some(id(Ref<int>.Of(in y))); // error: CS9914
+        }
+        Console.WriteLine(keep.Unwrap().Value);
+    }
+
+    static void OutlivesCapture()
+    {
+        mut Option<Ref<int>> keep = None;
+        {
+            int y = 1;
+            Get g = () => Ref<int>.Of(in y); // error: CS9925
+            keep = Some(g()); // error: CS9914
+        }
+        Console.WriteLine(keep.Unwrap().Value);
+    }
+
+    static void Main() { }
+}

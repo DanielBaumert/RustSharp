@@ -226,8 +226,7 @@ ref struct RPair<'a, 'b> { public Ref<'a, int> X; public Ref<'b, int> Y; }
 ```
 
 Not yet: lifetime parameters on classes and ordinary structs that store borrows (`CS9914`), variance
-beyond what the rules above imply, `where T : 'a`, lifetimes flowing through the type parameters of a
-generic method (so `OrderBy(s => s)` on `Ref<string>` items is still `CS9915`), and `str<'a>`.
+beyond what the rules above imply, `where T : 'a`, and `str<'a>`.
 
 ### Ref structs
 
@@ -426,6 +425,11 @@ consumes the delegate itself, and a second call is `CS9900`. This corresponds to
 A delegate type marked `[Mut]` corresponds to `FnMut`: only such delegates may change their captures,
 and calling one needs exclusive access (`CS9927`).
 
+A lambda may return a borrow of what it captures or of the data behind its arguments (`s => s` on a
+`Ref<string>`). Every call of a delegate therefore binds the result to all inputs, the delegate
+included: the result lives no longer than the arguments and the captures, and the result of a `[Mut]`
+delegate keeps the delegate borrowed, so it cannot be called again while the result is used (`CS9911`).
+
 ## LINQ
 
 LINQ works directly on lists and arrays, also in query syntax. It is lazy and monomorphized, and it
@@ -461,9 +465,8 @@ var evens = nums.Where(x => x % 2 == 0).Copied().ToList();                    //
   borrowed: changing it is `CS9909`, letting it die first is `CS9912`. Owned items may be kept freely; a
   `str` from `Split` still points at the text.
 - `q.Next()` is Rust's `next()`: `while (q.Next() is Some(var x)) ...` (the query must be `mut`).
-- An `OrderBy` key that is itself a reference (`OrderBy(s => s)` on `Ref<string>` items) is `CS9915`, as
-  RustSharp types carry no lifetime parameters. Write the value: `OrderBy(x => x.Value)`, Rust's
-  `|x| *x`.
+- A key or a projection may itself be a reference into the items: `OrderBy(s => s)` and
+  `Select(s => s)` on `Ref<string>` items, like Rust's `sort_by_key(|s| *s)`.
 
 Your own iterator implements `IIter<T>` with `Option<T> Next()`. It may lend what it borrows, never
 itself: `Some(Ref<int>.Of(in _field))` in `Next` is `CS9915`.

@@ -1,0 +1,24 @@
+// A lambda may return a borrow of the data behind its argument, as Rust's closures may: keys and
+// projections that are references themselves.
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+delegate Ref<int> Id(Ref<int> x);
+
+class P
+{
+    static void Main()
+    {
+        mut var names = new List<string> { "cyd", "ada", "bob" };
+        var sorted = names.Iter().OrderBy(s => s).ToList();       // keys are Ref<string>, like sort_by_key(|s| *s)
+        Console.WriteLine(sorted[0] + sorted[2]);
+        var same = names.Iter().Select(s => s).ToList();          // List<Ref<string>>
+        Console.WriteLine(same.Count + " " + same.At(1));
+
+        Id id = x => x;
+        int y = 7;
+        var r = id(Ref<int>.Of(in y));
+        Console.WriteLine(r + 1);
+    }
+}

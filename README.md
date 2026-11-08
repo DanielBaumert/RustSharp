@@ -172,9 +172,7 @@ general performance claims.
 - There is no `null`, neither in user code nor in the core library; use `Option<T>` for optional values.
   Only raw pointers in `unsafe` code may be null, as with Rust's `ptr::null`.
 - Lifetime parameters exist for ref structs and for `Ref<'a, T>`/`RefMut<'a, T>`, not yet for classes,
-  ordinary structs or `str`. Lifetimes do not flow through the type parameters of generic methods yet:
-  a closure result that borrows from its argument, such as the key in `OrderBy(s => s)` on
-  `Ref<string>` items, is still rejected; use `x => x.Value`.
+  ordinary structs or `str`.
 - Tasks are lazy, like Rust futures, rather than automatically starting like
   ordinary C# tasks.
 - The runtime uses a single reactor thread; file I/O runs on dedicated threads.
