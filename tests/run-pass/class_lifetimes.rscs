@@ -1,0 +1,56 @@
+// Classes and structs with lifetime parameters, like Rust's struct Index<'a> in a Box: the object holds
+// borrows in the fields that name its lifetimes, and its owner keeps them alive.
+using System;
+using System.Collections.Generic;
+
+class Index<'a>
+{
+    public List<Ref<'a, int>> Items = new List<Ref<'a, int>>();
+    public void Add(Ref<'a, int> r) { Items.Add(r); }
+    public readonly int Sum() { mut int s = 0; foreach (var r in Items.Iter()) s += r.Value; return s; }
+}
+
+class Holder<'a>
+{
+    public Ref<'a, int> R;
+    public Holder(Ref<'a, int> r) { R = r; }
+    public readonly Ref<'a, int> Get() => R;
+}
+
+class Loud<'a>
+{
+    public Ref<'a, int> R;
+    public Loud(Ref<'a, int> r) { R = r; }
+    ~Loud() { Console.WriteLine("drop " + R.Value.ToString()); }
+}
+
+struct View<'a> { public Ref<'a, int> R; }
+
+class P
+{
+    static View<'a> MakeView<'a>(Ref<'a, int> r) => new View<'a> { R = r };
+
+    static void Main()
+    {
+        int a = 1, b = 2;
+        mut var idx = new Index();
+        idx.Add(Ref<int>.Of(in a));
+        idx.Add(Ref<int>.Of(in b));
+        Console.WriteLine(idx.Sum());
+
+        // What Get returns points at a, not into the holder: it may outlive the holder.
+        mut Option<Ref<int>> kept = None;
+        {
+            var h = new Holder(Ref<int>.Of(in a));
+            kept = Some(h.Get());
+        }
+        Console.WriteLine(kept.Unwrap().Value);
+
+        // A destructor may read its borrows: c is declared first, so it is dropped after l.
+        int c = 7;
+        var l = new Loud(Ref<int>.Of(in c));
+
+        var v = MakeView(Ref<int>.Of(in b));
+        Console.WriteLine(v.R + 40);
+    }
+}

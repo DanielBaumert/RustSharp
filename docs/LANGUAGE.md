@@ -225,8 +225,30 @@ static Ref<'a, int> Pick<'a, 'b>(Ref<'a, int> x, Ref<'b, int> y) => x;   // y =>
 ref struct RPair<'a, 'b> { public Ref<'a, int> X; public Ref<'b, int> Y; }
 ```
 
-Not yet: lifetime parameters on classes and ordinary structs that store borrows (`CS9914`), variance
-beyond what the rules above imply, `where T : 'a`, and `str<'a>`.
+Classes and ordinary structs may declare lifetimes too, like a Rust struct in a `Box`. The fields that
+name a lifetime may hold borrows; the object's owner keeps them alive, and the object must not outlive
+them:
+
+```csharp
+class Index<'a>
+{
+    public List<Ref<'a, int>> Items = new List<Ref<'a, int>>();
+    public void Add(Ref<'a, int> r) { Items.Add(r); }
+}
+
+mut var idx = new Index();
+idx.Add(Ref<int>.Of(in a));
+a = 5;                       // CS9907 while idx is used
+```
+
+- An object with borrows cannot go where no lifetime is tracked: into a `static`, into an object that
+  declares no lifetimes, or to a thread (`CS9914`). The same holds for a variable a lambda captures,
+  because it lives in the lambda's environment.
+- A destructor may read the borrows, so they must still be alive when the object is dropped, as with
+  Rust's drop check: an object declared before what it borrows is `CS9912`.
+- A field without a lifetime can only hold `'static` borrows, as before.
+
+Not yet: variance beyond what the rules above imply, `where T : 'a`, and `str<'a>`.
 
 ### Ref structs
 

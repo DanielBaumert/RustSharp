@@ -1,0 +1,88 @@
+// An object that declares lifetimes must not outlive what it borrows, must not end up where no lifetime
+// is tracked (a static, an object without lifetimes, a thread), and its destructor must not see a dead
+// borrow (Rust's drop check). The thread and destructor cases compiled in a first version.
+using System;
+using System.Collections.Generic;
+using System.Threading;
+
+class Index<'a>
+{
+    public List<Ref<'a, int>> Items = new List<Ref<'a, int>>();
+    public void Add(Ref<'a, int> r) { Items.Add(r); }
+    public readonly int Sum() => Items.Count;
+}
+
+class Plain { public Option<Index<'static>> Inner = None; }
+class Store { public static Option<Index<'static>> Global = None; }
+class Loud<'a> { public Ref<'a, int> R; public Loud(Ref<'a, int> r) { R = r; } ~Loud() { Console.WriteLine(R.Value); } }
+struct View<'a> { public Ref<'a, int> R; }
+
+class P
+{
+    static void ChangedWhileHeld()
+    {
+        mut int a = 1;
+        mut var idx = new Index();
+        idx.Add(Ref<int>.Of(in a));
+        a = 5; // error: CS9907
+        Console.WriteLine(idx.Sum());
+    }
+
+    static void OutlivesReferent()
+    {
+        mut var idx = new Index();
+        {
+            int inner = 3;
+            idx.Add(Ref<int>.Of(in inner)); // error: CS9912
+        }
+        Console.WriteLine(idx.Sum());
+    }
+
+    static Index Escape()
+    {
+        int local = 1;
+        mut var idx = new Index();
+        idx.Add(Ref<int>.Of(in local)); // error: CS9912
+        return idx;
+    }
+
+    static void IntoObjectWithoutLifetimes()
+    {
+        int a = 1;
+        mut var idx = new Index();
+        idx.Add(Ref<int>.Of(in a)); // error: CS9914
+        mut var p = new Plain();
+        p.Inner = Some(idx);
+    }
+
+    static void IntoStatic()
+    {
+        int a = 1;
+        mut var idx = new Index();
+        idx.Add(Ref<int>.Of(in a)); // error: CS9914
+        unsafe { Store.Global = Some(idx); }
+    }
+
+    static void ToThread()
+    {
+        int a = 1;
+        mut var idx = new Index();
+        idx.Add(Ref<int>.Of(in a)); // error: CS9914
+        var t = Thread.Run(move () => idx.Sum());
+    }
+
+    static void DestructorAfterReferent()
+    {
+        Loud l;
+        int a = 1;
+        l = new Loud(Ref<int>.Of(in a)); // error: CS9912
+    }
+
+    static View<'a> ViewEscape<'a>(Ref<'a, int> keep)
+    {
+        int local = 1;
+        return new View<'a> { R = Ref<int>.Of(in local) }; // error: CS9914
+    }
+
+    static void Main() { }
+}
