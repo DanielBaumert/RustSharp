@@ -282,7 +282,8 @@ static int? Sum(string s)
 ```
 
 - `Some(x)` and `None` come from the prelude (`System.Option`), as in Rust. `None` fits any `Option<T>`;
-  written out, it is `Option<T>.None`.
+  written out, it is `Option<T>.None`. `Some(x)` also takes a reference, like `Some(&x)`: the Option
+  then lives no longer than what it borrows.
 - The value is only reachable after a check: `if (o is Some(var v))`, a `switch` with `Some(var v)` and
   `None` (it must cover both, `CS8509`), or `Unwrap()` and `Expect(msg)`, which panic explicitly on
   `None`. `IsSome`, `IsNone`, `UnwrapOr`, `Map`, `AndThen` and the other methods are listed below.

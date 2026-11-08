@@ -22,7 +22,7 @@ class P
         mut Option<Ref<int>> keep = None;
         {
             int y = 1;
-            keep = Some(id(Ref<int>.Of(in y))); // error: CS9914
+            keep = Some(id(Ref<int>.Of(in y))); // error: CS9912
         }
         Console.WriteLine(keep.Unwrap().Value);
     }
@@ -33,7 +33,7 @@ class P
         {
             int y = 1;
             Get g = () => Ref<int>.Of(in y); // error: CS9925
-            keep = Some(g()); // error: CS9914
+            keep = Some(g()); // error: CS9912
         }
         Console.WriteLine(keep.Unwrap().Value);
     }

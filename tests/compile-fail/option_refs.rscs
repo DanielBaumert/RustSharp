@@ -7,7 +7,7 @@ class P
     static Option<Ref<int>> Dangling()
     {
         int local = 1;
-        return Some(Ref<int>.Of(in local)); // error: CS9914
+        return Some(Ref<int>.Of(in local)); // error: CS9912
     }
 
     static void Main()
@@ -20,7 +20,7 @@ class P
         mut Option<Ref<int>> outlives = None;
         {
             int inner = 3;
-            outlives = Some(Ref<int>.Of(in inner)); // error: CS9914
+            outlives = Some(Ref<int>.Of(in inner)); // error: CS9912
         }
         Console.WriteLine(outlives.IsSome);
 

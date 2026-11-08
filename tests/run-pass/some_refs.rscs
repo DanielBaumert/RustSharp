@@ -1,0 +1,35 @@
+// The prelude's Some(x) passes a reference on, like Rust's Some(&x): it needs no 'static, and the Option
+// lives as long as what it borrows. This was CS9914 before.
+using System;
+using System.Collections.Generic;
+
+class P
+{
+    static void Main()
+    {
+        // A reference kept from one iteration to the next, Rust's `prev = Some(x)`.
+        mut var l = new List<int> { 1, 2, 3 };
+        mut Option<Ref<int>> prev = None;
+        foreach (var x in l.Iter())
+        {
+            if (prev is Some(var p)) Console.Write(p.Value + x.Value + " ");
+            prev = Some(x);
+        }
+        Console.WriteLine();
+
+        // Set in an inner block, used after it, while what it borrows still lives.
+        int a = 10;
+        mut Option<Ref<int>> keep = None;
+        {
+            keep = Some(Ref<int>.Of(in a));
+        }
+        Console.WriteLine(keep.Unwrap().Value);
+
+        // Generic combinators take references as well: MapOr's fallback, OkOr's error.
+        int b = 20;
+        Option<int> none = None;
+        Console.WriteLine(none.MapOr(Ref<int>.Of(in b), v => Ref<int>.Of(in a)).Value);
+        var res = none.OkOr(Ref<int>.Of(in b));
+        Console.WriteLine(res.UnwrapErr().Value);
+    }
+}

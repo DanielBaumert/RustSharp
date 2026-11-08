@@ -18,7 +18,7 @@ class P
         {
             mut var l = new List<int>();
             l.Add(1);
-            foreach (var x in l.Iter()) keep = Some(x); // error: CS9914
+            foreach (var x in l.Iter()) keep = Some(x); // error: CS9912
         }
         Console.WriteLine(keep.IsSome);
     }

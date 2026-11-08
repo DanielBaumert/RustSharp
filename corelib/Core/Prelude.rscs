@@ -3,6 +3,7 @@ global using static System.Option;
 namespace System
 {
     /// <summary>Rust's prelude: `Some(v)` and `None` without naming the Option's type.</summary>
+    [CarriesBorrows]
     public static class Option
     {
         public static Option<T> Some<T>(T value) => Option<T>.Some(value);

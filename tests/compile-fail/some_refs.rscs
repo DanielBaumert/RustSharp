@@ -1,0 +1,34 @@
+// Some(x), MapOr and OkOr pass a reference on without 'static, so the result is bound to what it borrows.
+using System;
+
+class P
+{
+    static void Fallback()
+    {
+        Option<int> none = None;
+        int outer = 0;
+        mut Option<Ref<int>> keep = None;
+        {
+            int inner = 1;
+            keep = Some(none.MapOr(Ref<int>.Of(in inner), v => Ref<int>.Of(in outer))); // error: CS9912
+        }
+        Console.WriteLine(keep.Unwrap().Value);
+    }
+
+    static Result<int, Ref<int>> Error()
+    {
+        int local = 2;
+        Option<int> none = None;
+        return none.OkOr(Ref<int>.Of(in local)); // error: CS9912
+    }
+
+    static void ChangedWhileKept()
+    {
+        mut int a = 1;
+        var keep = Some(Ref<int>.Of(in a));
+        a = 2; // error: CS9907
+        Console.WriteLine(keep.Unwrap().Value);
+    }
+
+    static void Main() { }
+}

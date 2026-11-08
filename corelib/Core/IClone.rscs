@@ -12,7 +12,11 @@ namespace System
     /// <summary>On Ref and RefMut: the struct is a reference, Rust's &amp;T or &amp;mut T.</summary>
     public sealed class ReferenceAttribute : Attribute { }
 
-    /// <summary>On Result and Option: they may hold references, and then live no longer than what those borrow.</summary>
+    /// <summary>
+    /// On Result, Option and the collections: they may hold references, and then live no longer than what
+    /// those borrow. It is a promise, like `unsafe impl`: the type's code, its generic methods included,
+    /// only passes values of its type parameters on and never stores them anywhere longer-lived.
+    /// </summary>
     public sealed class CarriesBorrowsAttribute : Attribute { }
 
     public enum Bound { Never = 0, Always = 1, Send = 2, Sync = 4 }
