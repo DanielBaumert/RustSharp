@@ -1,0 +1,26 @@
+// What stays allowed next to compile-fail/reborrow_through_field: the reborrow ends before k changes.
+using System;
+using System.Collections.Generic;
+
+ref struct View
+{
+    public ref List<int> P;
+    public View(ref List<int> p) { P = ref p; }
+}
+
+class Q
+{
+    static void Main()
+    {
+        mut var k = new List<int> { 1, 2, 3 };
+        {
+            mut var v = new View(ref k);
+            ref View t = ref v;
+            ref int e = ref t.P[0];
+            e = 5;
+        }
+        Console.WriteLine(k[0]);
+        k = new List<int> { 9 };
+        Console.WriteLine(k[0]);
+    }
+}

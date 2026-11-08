@@ -1,0 +1,67 @@
+// A reborrow through a reference to a ref struct, via one of its reference fields, must not outlive what
+// the struct borrows (Rust's supporting prefixes). Before the fix, `ref t.P[0]` survived `k = ...`, which
+// dropped the old list: a heap-use-after-free under ASan.
+using System;
+using System.Collections.Generic;
+
+ref struct View
+{
+    public ref List<int> P;
+    public View(ref List<int> p) { P = ref p; }
+}
+
+ref struct ReadView
+{
+    public ref readonly List<int> P;
+    public ReadView(ref readonly List<int> p) { P = ref p; }
+}
+
+class Q
+{
+    static void IntoOldBuffer()
+    {
+        mut var k = new List<int> { 1, 2, 3 };
+        mut var v = new View(ref k);
+        ref View t = ref v;
+        ref int e = ref t.P[0];
+        k = new List<int> { 9 }; // error: CS9907
+        e = 5;
+    }
+
+    static void ToTheVariable()
+    {
+        mut var k = new List<int> { 1 };
+        mut var v = new View(ref k);
+        ref View t = ref v;
+        ref List<int> r = ref t.P;
+        k = new List<int> { 9 }; // error: CS9907
+        Console.WriteLine(r.Count);
+    }
+
+    static void Shared()
+    {
+        mut var k = new List<int> { 1 };
+        var v = new ReadView(in k);
+        ref readonly ReadView t = ref v;
+        ref readonly List<int> r = ref t.P;
+        k = new List<int> { 9 }; // error: CS9907
+        Console.WriteLine(r.Count);
+    }
+
+    static void ThroughParameter(ref View t, ref List<int> k)
+    {
+        ref int e = ref t.P[0];
+        k = new List<int> { 9 };
+        e = 5;
+    }
+
+    // Inside, t.P and k cannot be the same list: the caller cannot pass both.
+    static void CallAliased()
+    {
+        mut var k = new List<int> { 1 };
+        mut var v = new View(ref k);
+        ThroughParameter(ref v, ref k); // error: CS9911
+    }
+
+    static void Main() { }
+}
