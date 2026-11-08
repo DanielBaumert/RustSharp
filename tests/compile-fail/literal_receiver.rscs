@@ -1,0 +1,14 @@
+using System;
+class P
+{
+    static str Words() => "a b c".Trim(); // a literal is 'static: fine
+    static void Main()
+    {
+        foreach (var w in "x,y".Split(',')) Console.WriteLine(w);
+        Console.WriteLine(Words());
+        str kept = "  padded ".Trim();
+        Console.WriteLine(kept);
+        str gone = "built".ToString().Trim(); // error: CS9913
+        Console.WriteLine(gone);
+    }
+}

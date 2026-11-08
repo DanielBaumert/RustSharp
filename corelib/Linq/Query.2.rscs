@@ -1,0 +1,148 @@
+namespace System.Linq
+{
+    public unsafe ref partial struct Query<T, I> where I : IIter<T>, allows ref struct
+    {
+
+        /// <summary>Some only when there is exactly one element.</summary>
+        public move Option<T> Single()
+        {
+            T* item = _it.Next();
+            if (item == null) return Option<T>.None;
+            T value = Mem.CloneOf(in *item);
+            if (_it.Next() != null) return Option<T>.None;
+            return Option<T>.Some(value);
+        }
+
+        public move Option<T> Max()
+        {
+            T* item = _it.Next();
+            if (item == null) return Option<T>.None;
+            T best = Mem.CloneOf(in *item);
+            while ((item = _it.Next()) != null)
+                if (Mem.CompareOf(in *item, in best) > 0) best = Mem.CloneOf(in *item);
+            return Option<T>.Some(best);
+        }
+
+        public move Option<T> Min()
+        {
+            T* item = _it.Next();
+            if (item == null) return Option<T>.None;
+            T best = Mem.CloneOf(in *item);
+            while ((item = _it.Next()) != null)
+                if (Mem.CompareOf(in *item, in best) < 0) best = Mem.CloneOf(in *item);
+            return Option<T>.Some(best);
+        }
+
+        public move int Count()
+        {
+            int n = 0;
+            while (_it.Next() != null) n++;
+            return n;
+        }
+
+        public move bool Any()
+        {
+            return _it.Next() != null;
+        }
+
+        public move bool Any(Predicate<T> test)
+        {
+            while (true)
+            {
+                T* item = _it.Next();
+                if (item == null) return false;
+                if (test(in *item)) return true;
+            }
+        }
+
+        public move bool All(Predicate<T> test)
+        {
+            while (true)
+            {
+                T* item = _it.Next();
+                if (item == null) return true;
+                if (!test(in *item)) return false;
+            }
+        }
+
+        public move A Aggregate<A>(A seed, Accumulator<A, T> step)
+        {
+            A acc = seed;
+            while (true)
+            {
+                T* item = _it.Next();
+                if (item == null) return acc;
+                acc = step(acc, in *item);
+            }
+        }
+
+        public move void ForEach(Visitor<T> visit)
+        {
+            while (true)
+            {
+                T* item = _it.Next();
+                if (item == null) return;
+                visit(in *item);
+            }
+        }
+
+        /// <summary>The first element, cloned: the query only ever lends it.</summary>
+        public move Option<T> First()
+        {
+            T* item = _it.Next();
+            if (item == null) return Option<T>.None;
+            return Option<T>.Some(Mem.CloneOf(in *item));
+        }
+
+        public move Option<T> Last()
+        {
+            T* item;
+            System.Collections.Generic.List<T> keep = new System.Collections.Generic.List<T>();
+            while ((item = _it.Next()) != null) { keep.Clear(); keep.Add(Mem.CloneOf(in *item)); }
+            return keep.RemoveLast();
+        }
+
+        /// <summary>Collects clones of the elements, like <c>.cloned().collect()</c>.</summary>
+        public move System.Collections.Generic.List<T> ToList()
+        {
+            var list = new System.Collections.Generic.List<T>();
+            while (true)
+            {
+                T* item = _it.Next();
+                if (item == null) return list;
+                list.Add(Mem.CloneOf(in *item));
+            }
+        }
+
+        public move T[] ToArray()
+        {
+            var list = ToListInternal();
+            T[] array = Mem.UninitArray<T>(list.Count);
+            for (int i = 0; i < array.Length; i++) Mem.Write(Mem.AddressOf(in array[i]), list.ReadOut(i));
+            list.ForgetAll();
+            return array;
+        }
+
+        private System.Collections.Generic.List<T> ToListInternal()
+        {
+            var list = new System.Collections.Generic.List<T>();
+            while (true)
+            {
+                T* item = _it.Next();
+                if (item == null) return list;
+                list.Add(Mem.CloneOf(in *item));
+            }
+        }
+
+        public move Enumerator GetEnumerator() => new Enumerator(_it);
+
+        public ref struct Enumerator
+        {
+            private I _it;
+            private T* _current;
+            internal Enumerator(I it) { _it = it; }
+            public bool MoveNext() { _current = _it.Next(); return _current != null; }
+            public readonly ref readonly T Current => ref *_current;
+        }
+    }
+}

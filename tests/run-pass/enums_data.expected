@@ -1,0 +1,14 @@
+Circle(2) 12
+Rect(2, 3) 6
+Empty 0
+-3
+stay
+move 1,2
+write hi
+quit
+has area
+1
+True
+drop inside
+True
+end

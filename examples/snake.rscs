@@ -1,0 +1,192 @@
+// Snake in the terminal: arrow keys or WASD steer, q quits.
+// Shows RustSharp with Rust semantics: an RAII guard for the terminal, an enum with data for input,
+// exhaustive switches, `mut` only where something changes, and Copy tuples for positions.
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+[Copy] enum Dir { Up, Down, Left, Right }
+
+enum Input
+{
+    Turn(Dir D),
+    Quit,
+    Nothing,
+}
+
+/// <summary>Raw terminal mode for as long as it lives, like a guard in Rust: dropping it restores the terminal.</summary>
+unsafe struct RawMode
+{
+    [DllImport("c")] static extern int tcgetattr(int fd, byte* termios);
+    [DllImport("c")] static extern int tcsetattr(int fd, int when, byte* termios);
+    [DllImport("c")] static extern void* malloc(long size);
+    [DllImport("c")] static extern void free(void* p);
+
+    byte* _saved;
+
+    public RawMode()
+    {
+        _saved = (byte*)malloc(128);
+        if (tcgetattr(0, _saved) != 0) return; // not a terminal: nothing to change
+        byte* raw = stackalloc byte[128];
+        for (mut int i = 0; i < 128; i++) raw[i] = _saved[i];
+        *(uint*)(raw + 12) &= ~(0x2u | 0x8u); // c_lflag: no ICANON, no ECHO
+        raw[17 + 6] = 0;                      // VMIN: read returns at once
+        raw[17 + 5] = 0;                      // VTIME
+        tcsetattr(0, 0, raw);
+        Console.Write("\u001b[?25l");          // hide the cursor
+    }
+
+    ~RawMode()
+    {
+        tcsetattr(0, 0, _saved);
+        free(_saved);
+        Console.Write("\u001b[?25h\n");
+    }
+}
+
+static unsafe class Keys
+{
+    [DllImport("c")] static extern int poll(long* fds, ulong count, int timeout);
+    [DllImport("c")] static extern long read(int fd, byte* buffer, long count);
+
+    /// <summary>Waits up to `ms` for a key.</summary>
+    public static Input Read(int ms)
+    {
+        long fd = 0 | (1L << 32); // struct pollfd { fd = 0, events = POLLIN }
+        if (poll(&fd, 1, ms) <= 0) return new Input.Nothing();
+        byte* b = stackalloc byte[8];
+        long n = read(0, b, 8);
+        if (n <= 0) return new Input.Nothing();
+        if (n >= 3 && b[0] == 27 && b[1] == '[')
+            return b[2] switch
+            {
+                (byte)'A' => new Input.Turn(Dir.Up),
+                (byte)'B' => new Input.Turn(Dir.Down),
+                (byte)'C' => new Input.Turn(Dir.Right),
+                (byte)'D' => new Input.Turn(Dir.Left),
+                _ => new Input.Nothing(),
+            };
+        return b[0] switch
+        {
+            (byte)'w' => new Input.Turn(Dir.Up),
+            (byte)'s' => new Input.Turn(Dir.Down),
+            (byte)'a' => new Input.Turn(Dir.Left),
+            (byte)'d' => new Input.Turn(Dir.Right),
+            (byte)'q' => new Input.Quit(),
+            _ => new Input.Nothing(),
+        };
+    }
+}
+
+class P
+{
+    const int Width = 30, Height = 15;
+
+    static (int X, int Y) Step((int X, int Y) p, Dir d) => d switch
+    {
+        Dir.Up => (p.X, p.Y - 1),
+        Dir.Down => (p.X, p.Y + 1),
+        Dir.Left => (p.X - 1, p.Y),
+        Dir.Right => (p.X + 1, p.Y),
+    };
+
+    static bool Opposite(Dir a, Dir b) => (a, b) switch
+    {
+        (Dir.Up, Dir.Down) or (Dir.Down, Dir.Up) or (Dir.Left, Dir.Right) or (Dir.Right, Dir.Left) => true,
+        _ => false,
+    };
+
+    static bool Contains(in List<(int X, int Y)> body, (int X, int Y) p)
+    {
+        foreach (var part in body) if (part.X == p.X && part.Y == p.Y) return true;
+        return false;
+    }
+
+    // A small linear congruential generator: no global state, the caller owns the seed.
+    static (int X, int Y) Food(ref ulong seed, in List<(int X, int Y)> body)
+    {
+        while (true)
+        {
+            seed = seed * 6364136223846793005UL + 1442695040888963407UL;
+            var p = ((int)((seed >> 33) % Width), (int)((seed >> 45) % Height));
+            if (!Contains(in body, p)) return p;
+        }
+    }
+
+    static void Draw(in List<(int X, int Y)> body, (int X, int Y) food, int score)
+    {
+        mut var screen = new StringBuilder();
+        screen.Append("\u001b[H\u001b[2J");
+        screen.Append("Snake  score " + score.ToString() + "   (arrows/WASD, q quits)\n");
+        screen.Append("+" + "-".Repeat(Width) + "+\n");
+        for (mut int y = 0; y < Height; y++)
+        {
+            screen.Append('|');
+            for (mut int x = 0; x < Width; x++)
+            {
+                var here = (x, y);
+                if (body[0].X == x && body[0].Y == y) screen.Append('@');
+                else if (Contains(in body, here)) screen.Append('o');
+                else if (food.X == x && food.Y == y) screen.Append('*');
+                else screen.Append(' ');
+            }
+            screen.Append("|\n");
+        }
+        screen.Append("+" + "-".Repeat(Width) + "+\n");
+        Console.Write(screen.ToString());
+    }
+
+    static void Main()
+    {
+        var terminal = new RawMode();
+        mut var body = new List<(int X, int Y)>();
+        body.Add((Width / 2, Height / 2));
+        body.Add((Width / 2 - 1, Height / 2));
+        mut var dir = Dir.Right;
+        mut ulong seed = (ulong)Runtime.NowMs() | 1;
+        mut var food = Food(ref seed, in body);
+        mut int score = 0;
+        mut bool quit = false;
+
+        while (!quit)
+        {
+            Draw(in body, food, score);
+            long until = Runtime.NowMs() + 120 - Math.Min(score, 60);
+            while (Runtime.NowMs() < until)
+            {
+                switch (Keys.Read((int)(until - Runtime.NowMs())))
+                {
+                    case Input.Turn(var d) when !Opposite(d, dir):
+                        dir = d;
+                        break;
+                    case Input.Quit:
+                        quit = true;
+                        break;
+                    case Input.Turn or Input.Nothing:
+                        break;
+                }
+            }
+
+            var head = Step(body[0], dir);
+            bool wall = head.X < 0 || head.Y < 0 || head.X >= Width || head.Y >= Height;
+            if (wall || Contains(in body, head)) break;
+            body.Insert(0, head);
+            if (head.X == food.X && head.Y == food.Y)
+            {
+                score += 10;
+                food = Food(ref seed, in body);
+            }
+            else
+            {
+                body.Pop();
+            }
+        }
+
+        Draw(in body, food, score);
+        Console.WriteLine("Game over. Score " + score.ToString());
+    }
+}

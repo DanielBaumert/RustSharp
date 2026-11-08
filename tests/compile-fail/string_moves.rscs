@@ -1,0 +1,31 @@
+using System;
+using System.Collections.Generic;
+class P
+{
+    static void Take(string s) { Console.WriteLine(s); }
+    static int Measure(in string s) => s.Length;
+    static void Main()
+    {
+        string a = "hello";
+        string b = a;
+        Console.WriteLine(a); // error: CS9900
+
+        string c = "x";
+        Take(c);
+        Console.WriteLine(c.Length); // error: CS9901
+
+        string d = "y";
+        Console.WriteLine(Measure(in d) + d.Length);
+        Console.WriteLine(d + d);
+        Console.WriteLine(d == "y");
+        Console.WriteLine($"{d}!");
+        switch (d) { case "y": Console.WriteLine("matched"); break; }
+        Console.WriteLine(int.Parse(d).IsErr);
+
+        mut var names = new List<string>();
+        string e = "z";
+        names.Add(e);
+        Console.WriteLine(e); // error: CS9900
+        var f = e.Clone(); // error: CS9901
+    }
+}

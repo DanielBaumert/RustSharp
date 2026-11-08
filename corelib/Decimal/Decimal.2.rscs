@@ -1,0 +1,156 @@
+namespace System
+{
+    public readonly unsafe partial struct Decimal
+    {
+
+        private static void Add(uint* a, uint* b)
+        {
+            ulong carry = 0;
+            for (int i = 0; i < Words; i++)
+            {
+                ulong v = (ulong)a[i] + b[i] + carry;
+                a[i] = (uint)v;
+                carry = v >> 32;
+            }
+        }
+
+        private static void Sub(uint* a, uint* b)
+        {
+            long borrow = 0;
+            for (int i = 0; i < Words; i++)
+            {
+                long v = (long)a[i] - b[i] + borrow;
+                a[i] = (uint)v;
+                borrow = v >> 32;
+            }
+        }
+
+        private static void Mul(uint* a, uint* b, uint* result)
+        {
+            Clear(result);
+            for (int i = 0; i < Words; i++)
+            {
+                ulong carry = 0;
+                for (int j = 0; i + j < Words; j++)
+                {
+                    ulong v = (ulong)a[i] * b[j] + result[i + j] + carry;
+                    result[i + j] = (uint)v;
+                    carry = v >> 32;
+                }
+            }
+        }
+
+        private static void ScaleUp(uint* w, int digits)
+        {
+            for (int i = 0; i < digits; i++) MulSmall(w, 10);
+        }
+
+        /// <summary>Schoolbook binary division of 256-bit values.</summary>
+        private static void DivMod(uint* n, uint* d, uint* q, uint* r)
+        {
+            Clear(q);
+            Clear(r);
+            for (int bit = Words * 32 - 1; bit >= 0; bit--)
+            {
+                uint top = 0;
+                for (int i = 0; i < Words; i++)
+                {
+                    uint next = r[i] >> 31;
+                    r[i] = (r[i] << 1) | top;
+                    top = next;
+                }
+                r[0] |= (n[bit >> 5] >> (bit & 31)) & 1;
+                if (Compare(r, d) >= 0)
+                {
+                    Sub(r, d);
+                    q[bit >> 5] |= 1u << (bit & 31);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Builds a decimal from an unbounded mantissa: digits are dropped until it fits, rounding once at
+        /// the end. <paramref name="sticky"/> says that nonzero digits were already lost before this call.
+        /// </summary>
+        private static decimal Make(uint* w, int scale, bool negative, bool sticky)
+        {
+            uint last = 0;
+            bool dropped = false;
+            while (scale > MaxScale || !Fits(w))
+            {
+                if (scale == 0)
+                {
+                    Fail(Overflowed, "decimal overflow");
+                    return default;
+                }
+                if (last != 0) sticky = true;
+                last = DivSmall(w, 10);
+                scale--;
+                dropped = true;
+            }
+
+            if (dropped && (last > 5 || (last == 5 && (sticky || (w[0] & 1) != 0))))
+            {
+                AddSmall(w, 1);
+                if (!Fits(w)) return Make(w, scale, negative, true);
+            }
+
+            return new decimal((int)w[0], (int)w[1], (int)w[2], negative && !IsZero(w), (byte)scale);
+        }
+
+        private static void Align(decimal a, decimal b, uint* x, uint* y, out int scale)
+        {
+            Load(a, x);
+            Load(b, y);
+            int sa = ScaleOf(a), sb = ScaleOf(b);
+            scale = sa > sb ? sa : sb;
+            ScaleUp(x, scale - sa);
+            ScaleUp(y, scale - sb);
+        }
+
+        private static decimal AddSigned(decimal a, decimal b, bool flipB)
+        {
+            uint* x = stackalloc uint[Words];
+            uint* y = stackalloc uint[Words];
+            Align(a, b, x, y, out int scale);
+            bool na = IsNeg(a);
+            bool nb = IsNeg(b) != flipB;
+            if (na == nb)
+            {
+                Add(x, y);
+                return Make(x, scale, na, false);
+            }
+            if (Compare(x, y) >= 0)
+            {
+                Sub(x, y);
+                return Make(x, scale, na, false);
+            }
+            Sub(y, x);
+            return Make(y, scale, nb, false);
+        }
+
+        public static decimal operator +(decimal a, decimal b) => AddSigned(a, b, false);
+        public static decimal operator -(decimal a, decimal b) => AddSigned(a, b, true);
+        public static decimal operator -(decimal a) => new decimal((int)a._lo, (int)a._mid, (int)a._hi, !IsNeg(a), (byte)ScaleOf(a));
+        public static decimal operator +(decimal a) => a;
+        public static decimal operator ++(decimal a) => a + One;
+        public static decimal operator --(decimal a) => a - One;
+
+        public static decimal operator *(decimal a, decimal b)
+        {
+            uint* x = stackalloc uint[Words];
+            uint* y = stackalloc uint[Words];
+            uint* r = stackalloc uint[Words];
+            Load(a, x);
+            Load(b, y);
+            Mul(x, y, r);
+
+            // Matches .NET's two multiplication paths: products of 32-bit mantissas keep the summed scale
+            // even when they are zero, unless that scale leaves nothing representable.
+            int scale = ScaleOf(a) + ScaleOf(b);
+            bool small = (a._mid | a._hi | b._mid | b._hi) == 0;
+            if (small ? scale > MaxScale + 19 : IsZero(r)) return new decimal(0);
+            return Make(r, scale, IsNeg(a) != IsNeg(b), false);
+        }
+    }
+}

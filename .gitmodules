@@ -1,0 +1,4 @@
+[submodule "roslyn"]
+	path = roslyn
+	url = https://github.com/DanielBaumert/roslyn.git
+	branch = rustsharp

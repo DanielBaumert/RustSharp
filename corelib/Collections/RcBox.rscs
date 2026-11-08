@@ -1,0 +1,9 @@
+namespace System
+{
+    internal unsafe struct RcBox<T>
+    {
+        public long Strong;
+        public long Weak;
+        public T Value;
+    }
+}

@@ -1,0 +1,117 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+class R { ~R() { Console.WriteLine("cancelled drop"); } }
+class P
+{
+    static long Now() => Runtime.NowMs();
+    static async Task<int> After(int ms, int v) { await Task.Delay(ms); return v; }
+    static async Task<int> Forever() { var r = new R(); await Task.Delay(1000000); return 0; }
+    static async Task<int> Locked(AsyncMutex<int> m)
+    {
+        for (mut int i = 0; i < 100; i++)
+        {
+            mut var g = await m.LockAsync();
+            int v = g.Value;
+            await Task.Yield(); // the guard may live across an await
+            g.Value = v + 1;
+        }
+        return 0;
+    }
+    static async Task<int> Limited(Semaphore s, Arc<AtomicInt> active, Arc<AtomicInt> peak)
+    {
+        var permit = await s.AcquireAsync();
+        int now = active.Value.Increment();
+        while (true)
+        {
+            int p = peak.Value.Value;
+            if (now <= p || peak.Value.CompareExchange(p, now)) break;
+        }
+        await Task.Delay(5);
+        active.Value.Add(-1);
+        return 0;
+    }
+    static async Task<int> Producer(Sender<int> tx, int n)
+    {
+        for (mut int i = 0; i < n; i++) await tx.SendAsync(i);
+        return 0;
+    }
+    static async Task Main()
+    {
+        // select!: the first one wins, the rest are cancelled.
+        Console.WriteLine(await Task.WhenAny(Forever(), After(5, 1)));
+        var (winner, value) = await Task.Race(After(100, 1), After(5, 2));
+        Console.WriteLine(winner * 10 + value);
+
+        // timeout
+        Console.WriteLine((await Task.Timeout(After(1, 7), 1000)).Unwrap());
+        Console.WriteLine((await Task.Timeout(After(1000, 7), 5)).UnwrapErr());
+
+        // interval
+        mut var tick = new Interval(5);
+        long start = Now();
+        for (mut int i = 0; i < 4; i++) await tick.TickAsync();
+        long took = Now() - start;
+        Console.WriteLine(took >= 18 && took < 200);
+
+        // AsyncMutex held across await
+        var m = new AsyncMutex<int>(0);
+        mut var jobs = new List<JoinHandle<int>>();
+        for (mut int i = 0; i < 4; i++)
+        {
+            var c = m.Clone();
+            jobs.Add(Task.Run(move () => Locked(c)));
+        }
+        while (jobs.Count > 0) await jobs.RemoveAt(0);
+        mut var g = await m.LockAsync();
+        Console.WriteLine(g.Value);
+        Mem.Drop(g);
+
+        // Semaphore
+        var sem = new Semaphore(3);
+        var active = new Arc<AtomicInt>(new AtomicInt(0));
+        var peak = new Arc<AtomicInt>(new AtomicInt(0));
+        mut var limited = new List<JoinHandle<int>>();
+        for (mut int i = 0; i < 12; i++)
+        {
+            var s = sem.Clone();
+            var a = active.Clone();
+            var p = peak.Clone();
+            limited.Add(Task.Run(move () => Limited(s, a, p)));
+        }
+        while (limited.Count > 0) await limited.RemoveAt(0);
+        Console.WriteLine(peak.Value.Value);
+
+        // Bounded channel with backpressure
+        var (tx, rx) = Channel.CreateBounded<int>(2);
+        var producer = Task.Run(move () => Producer(tx, 1000));
+        mut long sum = 0;
+        while (true)
+        {
+            if (!(await rx.ReceiveAsync() is Some(var v))) break;
+            sum += v;
+        }
+        await producer;
+        Console.WriteLine(sum);
+
+        // oneshot
+        var tcs = new TaskCompletionSource<string>();
+        var pending = tcs.Task;
+        tcs.SetResult("done");
+        Console.WriteLine(await pending);
+
+        // abort
+        var handle = Task.Run(move () => Forever());
+        await Task.Delay(10);
+        handle.Abort();
+        Console.WriteLine((await handle).UnwrapErr());
+
+        // blocking work and files
+        Console.WriteLine((await Task.RunBlocking(move () => { Thread.Sleep(5); return 6 * 7; })).Unwrap());
+        string path = "/tmp/rustsharp_tokio_test.txt";
+        await System.IO.File.WriteAllTextAsync(path, "grüße");
+        Console.WriteLine((await System.IO.File.ReadAllTextAsync(path)).Unwrap());
+        Console.WriteLine((await System.IO.File.ReadAllTextAsync("/nonexistent/x")).UnwrapErr());
+    }
+}

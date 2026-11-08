@@ -1,0 +1,12 @@
+using System.Collections.Generic;
+using System.Threading;
+
+namespace System.Threading.Tasks
+{
+    internal struct WatchState<T>
+    {
+        public T Value;
+        public long Version;
+        public List<Waker> Waiters;
+    }
+}

@@ -1,0 +1,23 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    internal sealed unsafe class CoroutineTask<T> : Task<T>
+    {
+        private Coroutine _c;
+        public CoroutineTask(void* frame, delegate*<void*, void*, int> resume, delegate*<void*, void> drop)
+        {
+            _c.Frame = frame;
+            _c.Resume = resume;
+            _c.Drop = drop;
+        }
+        internal override bool PollCore()
+        {
+            // The coroutine writes its result into the empty Option when it finishes (Rust's MaybeUninit).
+            if (_c.Resume(_c.Frame, _result.UninitSlot()) != 1) return false;
+            _result.AssumeSome();
+            return true;
+        }
+        ~CoroutineTask() { _c.Drop(_c.Frame); }
+    }
+}

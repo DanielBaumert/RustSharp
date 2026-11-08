@@ -1,0 +1,47 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    internal sealed unsafe class ConnectTask<S> : IoTask<S>
+    {
+        private Sockaddr _address;
+        private delegate*<int, S> _make;
+        private int _fd = -1;
+        private Option<S> _stream = Option<S>.None;
+
+        public ConnectTask(Sockaddr address, delegate*<int, S> make) { _address = address; _make = make; }
+
+        internal override bool PollCore()
+        {
+            if (_fd < 0)
+            {
+                _fd = Sys.socket(_address.Family, 0x80801, 0);
+                if (_fd < 0) return Fail(Address.ErrorText("socket"));
+                _stream = Option<S>.Some(_make(_fd));
+                if (Sys.connect(_fd, Mem.AddressOf(in _address), (uint)_address.Length) == 0)
+                {
+                    return Done(_stream.Take().Unwrap());
+                }
+                if (Sys.Errno != Sys.EINPROGRESS) return Fail(Address.ErrorText("connect"));
+                if (Reactor.Wait(_fd, true)) return false;
+            }
+
+            // Only a writable socket has finished connecting; poll(2) tells without side effects.
+            long probe = (long)_fd | (4L << 32); // struct pollfd { int fd; short events = POLLOUT; short revents; }
+            while (Sys.poll(&probe, 1, 0) == 0)
+            {
+                if (Reactor.Wait(_fd, true)) return false;
+            }
+
+            int error = 0;
+            uint len = 4;
+            Sys.getsockopt(_fd, 1, 4, &error, &len); // SO_ERROR
+            if (error != 0) return Fail("connect failed, errno " + error.ToString());
+            return Done(_stream.Take().Unwrap());
+        }
+    }
+}

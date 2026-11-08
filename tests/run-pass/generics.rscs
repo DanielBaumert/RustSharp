@@ -1,0 +1,59 @@
+using System;
+using System.Collections.Generic;
+class Box<T>
+{
+    T _value;
+    public Box(T value) { _value = value; }
+    public ref T Value => ref _value;
+    public move T Into() => _value;
+}
+struct Pair<A, B>
+{
+    public A First;
+    public B Second;
+    public Pair(A a, B b) { First = a; Second = b; }
+}
+class Node { public int V; public Node(int v) { V = v; } ~Node() { Console.WriteLine("drop node " + V.ToString()); } }
+interface IAdd<T> { T Add(T other); }
+struct Num : IAdd<Num>
+{
+    public int V;
+    public Num(int v) { V = v; }
+    public Num Add(Num o) => new Num(V + o.V);
+}
+class P
+{
+    static T Id<T>(T x) => x;
+    static T Sum<T>(mut T a, T b) where T : IAdd<T> => a.Add(b);
+    static void Main()
+    {
+        mut var l = new List<int>();
+        for (mut int i = 1; i <= 5; i++) l.Add(i * i);
+        mut int s = 0;
+        foreach (var x in l) s += x;
+        Console.WriteLine(s);
+        l[2] = 100;
+        Console.WriteLine(l[2]);
+        Console.WriteLine(l.Count);
+
+        mut var nodes = new List<Node>();
+        nodes.Add(new Node(1));
+        nodes.Add(new Node(2));
+        nodes.Add(new Node(3));
+        foreach (ref readonly var n in nodes) Console.WriteLine(n.V);
+        var removed = nodes.RemoveAt(0);
+        Console.WriteLine(removed.V + nodes.Count);
+
+        mut var b = new Box<string>("boxed");
+        b.Value = "changed";
+        Console.WriteLine(b.Value);
+        string inner = b.Into();
+        Console.WriteLine(inner);
+
+        var p = new Pair<int, string>(7, "seven");
+        Console.WriteLine(p.Second + p.First.ToString());
+        Console.WriteLine(Id(5) + Id(6));
+        Console.WriteLine(Id("id"));
+        Console.WriteLine(Sum(new Num(2), new Num(40)).V);
+    }
+}

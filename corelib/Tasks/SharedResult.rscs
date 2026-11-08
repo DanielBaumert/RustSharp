@@ -1,0 +1,80 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>The result of a spawned task, shared between its worker and whoever awaits it.</summary>
+    [SendWhen(Bound.Send), SyncWhen(Bound.Send)]
+    internal unsafe struct SharedResult<T> : IClone<SharedResult<T>>
+    {
+        private struct State
+        {
+            public long Refs;
+            public void* Lock;
+            public int Done;
+            public int Aborted;
+            // calloc'd: zeroed memory is None for all three
+            public Option<T> Value;
+            public Option<Exception> Error;
+            public Option<Waker> Joiner;
+        }
+
+        private State* _s;
+
+        public SharedResult()
+        {
+            _s = (State*)Libc.calloc(1, Mem.SizeOf<State>());
+            _s->Refs = 1;
+            _s->Lock = Libc.malloc(64);
+            Pthread.pthread_mutex_init(_s->Lock, null);
+        }
+
+        private SharedResult(State* s) { _s = s; }
+
+        public readonly SharedResult<T> Clone()
+        {
+            Atomic.Add(Mem.AddressOf(in _s->Refs), 1L);
+            return new SharedResult<T>(_s);
+        }
+
+        public readonly void RequestAbort() { Atomic.Store(Mem.AddressOf(in _s->Aborted), 1); }
+        public readonly bool AbortRequested => Atomic.Load(Mem.AddressOf(in _s->Aborted)) != 0;
+
+        /// <summary>The task's value, or the panic that ended it: exactly one of the two is Some.</summary>
+        public readonly void Finish(Option<T> value, Option<Exception> error)
+        {
+            Pthread.pthread_mutex_lock(_s->Lock);
+            var oldValue = Mem.Replace(ref _s->Value, value);
+            var oldError = Mem.Replace(ref _s->Error, error);
+            _s->Done = 1;
+            var joiner = _s->Joiner.Take();
+            Pthread.pthread_mutex_unlock(_s->Lock);
+            joiner.Wake();
+        }
+
+        public readonly bool TryTake(ref Option<T> value, ref Option<Exception> error)
+        {
+            Pthread.pthread_mutex_lock(_s->Lock);
+            bool done = _s->Done != 0;
+            if (done)
+            {
+                value = _s->Value.Take();
+                error = _s->Error.Take();
+            }
+            else
+            {
+                var old = Mem.Replace(ref _s->Joiner, Option<Waker>.Some(Runtime.CurrentWaker()));
+            }
+            Pthread.pthread_mutex_unlock(_s->Lock);
+            return done;
+        }
+
+        ~SharedResult()
+        {
+            if (_s == null || Atomic.Add(Mem.AddressOf(in _s->Refs), -1L) != 1) return;
+            Pthread.pthread_mutex_destroy(_s->Lock);
+            Libc.free(_s->Lock);
+            Mem.DropInPlace(_s);
+            Libc.free(_s);
+        }
+    }
+}

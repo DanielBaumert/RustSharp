@@ -1,0 +1,38 @@
+using System;
+
+// Rust: let x = Abx::A;  let s = Shape::Circle(2.0);
+Abx x = Abx.A;
+Console.WriteLine(x.a());
+Shape s = Shape.Circle(2);
+Console.WriteLine(s + " " + s.a());
+var t = Tree<int>.Node(Tree<int>.Leaf(1), Tree<int>.Leaf(2));
+Console.WriteLine(t.Sum());
+Console.WriteLine(Pick(true) is Shape.Empty);
+return 0;
+
+static Shape Pick(bool empty) => empty ? Shape.Empty : Shape.Circle(1);
+
+interface ICool<T> { readonly T a(); }
+
+enum Abx : ICool<int>
+{
+    A, B, C;
+
+    public readonly int a() => this switch { Abx.A => 1, Abx.B => 2, Abx.C => 3 };
+}
+
+enum Shape : ICool<double>
+{
+    Circle(double R),
+    Empty;
+
+    public readonly double a() => this switch { Circle(var r) => 3 * r * r, Empty => 0 };
+}
+
+enum Tree<T>
+{
+    Leaf(int V),
+    Node(Tree<T> L, Tree<T> R);
+
+    public readonly int Sum() => this switch { Leaf(var v) => v, Node(var l, var r) => l.Sum() + r.Sum() };
+}

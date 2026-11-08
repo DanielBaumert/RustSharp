@@ -1,0 +1,25 @@
+using System;
+
+class Program {
+    static void Main() {
+        Abx x = new Abx.A();
+        Console.WriteLine(x.a());
+    }
+}
+
+
+interface ICool<T> { readonly T a(); }
+
+enum Abx : ICool<int>  {
+    A, B, C;
+
+    public readonly int a() => 
+        this switch { 
+            Abx.A => 1, 
+            Abx.B => 2, 
+            Abx.C => 3
+        };
+}
+
+
+

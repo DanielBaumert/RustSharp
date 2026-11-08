@@ -1,0 +1,9 @@
+namespace System
+{
+    public readonly partial struct Char
+    {
+        public override string ToString() => new Rune(this).ToString();
+        public static bool IsDigit(char c) => c >= '0' && c <= '9';
+        public static bool IsWhiteSpace(char c) => c == ' ' || c == '\t' || c == '\n' || c == '\r';
+    }
+}

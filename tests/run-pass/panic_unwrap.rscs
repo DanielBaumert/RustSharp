@@ -1,0 +1,12 @@
+using System;
+// exit: 101
+class P
+{
+    static void Main()
+    {
+        var ok = int.Parse("7");
+        Console.WriteLine(ok.Expect("a number"));
+        var bad = int.Parse("seven");
+        Console.WriteLine(bad.Unwrap());
+    }
+}

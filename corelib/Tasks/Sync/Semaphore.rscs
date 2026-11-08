@@ -1,0 +1,18 @@
+using System.Collections.Generic;
+using System.Threading;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>Limits how many tasks proceed at once. Dropping a permit returns it.</summary>
+    [SendWhen(Bound.Always), SyncWhen(Bound.Always)]
+    public unsafe struct Semaphore : IClone<Semaphore>
+    {
+        private WaitState* _s;
+        public Semaphore(int permits) { _s = WaitState.Create(permits); }
+        private Semaphore(WaitState* s) { _s = s; }
+        public readonly Semaphore Clone() => new Semaphore(WaitState.Retain(_s));
+        private static Permit Make(WaitState* s) => new Permit(WaitState.Retain(s));
+        public readonly Task<Permit> AcquireAsync() => new AcquireTask<Permit>(_s, &Make);
+        ~Semaphore() { if (_s != null) WaitState.Release(_s); }
+    }
+}

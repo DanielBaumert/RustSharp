@@ -1,0 +1,45 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Net.Sockets;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>Waits for operating system signals: tokio::signal.</summary>
+    public static unsafe class Signal
+    {
+        public const int Interrupt = 2, Terminate = 15, User1 = 10;
+
+        [DllImport("c")] private static extern void* signal(int number, delegate*<int, void> handler);
+        [DllImport("c")] private static extern int pipe2(int* fds, int flags);
+
+        private static int s_read = -1;
+        private static int s_write = -1;
+
+        // Runs in the signal handler, so it may only use async-signal-safe calls.
+        private static void OnSignal(int number)
+        {
+            long value = number;
+            Sys.write(s_write, &value, 8);
+        }
+
+        [DllImport("c")] private static extern int raise(int number);
+
+        /// <summary>Sends a signal to this process.</summary>
+        public static void Raise(int number) { raise(number); }
+
+        /// <summary>Resolves with the signal number once the signal arrives.</summary>
+        public static Task<int> WaitAsync(int number)
+        {
+            if (s_read < 0)
+            {
+                int* fds = stackalloc int[2];
+                pipe2(fds, 0x80800);
+                s_read = fds[0];
+                s_write = fds[1];
+            }
+            signal(number, &OnSignal);
+            return new SignalTask(s_read);
+        }
+    }
+}

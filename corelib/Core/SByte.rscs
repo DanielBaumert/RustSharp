@@ -1,0 +1,10 @@
+namespace System
+{
+    public readonly struct SByte { public override string ToString() => Number.Format((long)this); }
+
+    public readonly struct Byte { public override string ToString() => Number.Format((long)this); }
+
+    public readonly struct Int16 { public override string ToString() => Number.Format((long)this); }
+
+    public readonly struct UInt16 { public override string ToString() => Number.Format((long)this); }
+}

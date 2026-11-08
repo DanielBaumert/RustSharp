@@ -1,0 +1,53 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    public sealed unsafe class UdpSocket
+    {
+        [DllImport("c")] internal static extern long sendto(int fd, void* p, long n, int flags, void* to, uint len);
+        [DllImport("c")] internal static extern long recvfrom(int fd, void* p, long n, int flags, void* from, uint* len);
+
+        private Arc<SocketHandle> _socket;
+        private UdpSocket(int fd) { _socket = new Arc<SocketHandle>(new SocketHandle(fd)); }
+
+        public static Result<UdpSocket, IoError> Bind(string host, int port)
+        {
+            Sockaddr a = default;
+            if (!Address.TryParse(host, port, &a)) return Result<UdpSocket, IoError>.Err(new IoError("invalid address " + host));
+            int fd = Sys.socket(a.Family, 0x80802, 0); // SOCK_DGRAM | SOCK_NONBLOCK | SOCK_CLOEXEC
+            if (fd < 0) return Result<UdpSocket, IoError>.Err(new IoError(Address.ErrorText("socket")));
+            if (Sys.bind(fd, &a, (uint)a.Length) != 0)
+            {
+                string error = Address.ErrorText("bind");
+                Sys.close(fd);
+                return Result<UdpSocket, IoError>.Err(new IoError(error));
+            }
+            return Result<UdpSocket, IoError>.Ok(new UdpSocket(fd));
+        }
+
+        public readonly int LocalPort
+        {
+            get
+            {
+                Sockaddr a = default;
+                uint len = 112;
+                Sys.getsockname(_socket.Value.Fd, &a, &len);
+                return Address.Port(&a);
+            }
+        }
+
+        public readonly 'a Task<Result<int, IoError>> SendToAsync(in 'a byte[] buffer, int count, string host, int port)
+        {
+            Sockaddr a = default;
+            if (!Address.TryParse(host, port, &a)) return IoTask<int>.Failed("invalid address " + host);
+            return new SendToTask(_socket.Clone(), Mem.AddressOf(in buffer[0]), count, a);
+        }
+
+        public readonly 'a Task<Result<(int Length, string Host, int Port), IoError>> ReceiveFromAsync(ref 'a byte[] buffer)
+            => new ReceiveFromTask(_socket.Clone(), Mem.AddressOf(in buffer[0]), buffer.Length);
+    }
+}

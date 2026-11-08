@@ -1,0 +1,10 @@
+using System;
+class P
+{
+    static Result<Unit, ParseError> Main()
+    {
+        int n = int.Parse("41")?;
+        Console.WriteLine(n + 1);
+        return Result<Unit, ParseError>.Ok(default);
+    }
+}

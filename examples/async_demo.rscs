@@ -1,0 +1,42 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+record Order(int Id, string Item, decimal Price);
+
+class Program
+{
+    static async Task<decimal> Process(Order order)
+    {
+        await Task.Delay(10);
+        return order.Price * 1.19m;
+    }
+
+    static async Task Main()
+    {
+        var orders = new List<Order>
+        {
+            new Order(1, "Tee", 4.50m),
+            new Order(2, "Kaffee", 3.20m),
+            new Order(3, "Kuchen", 5.00m),
+        };
+
+        // LINQ lends the elements to the lambdas: `orders` stays usable.
+        var names = orders.Where(o => o.Price > 4m).Select(o => o.Item).ToList();
+        Console.WriteLine($"teuer: {names.Count}");
+
+        // Each task owns its copy of the order. All of them run at the same time.
+        mut var tasks = new List<JoinHandle<decimal>>();
+        foreach (ref readonly var order in orders)
+        {
+            var mine = order.Clone();
+            tasks.Add(Task.Run(move () => Process(mine)));
+        }
+
+        mut decimal total = 0;
+        while (tasks.Count > 0) total += (await tasks.RemoveAt(0)).Unwrap();
+        Console.WriteLine($"gesamt: {total}");
+    }
+}

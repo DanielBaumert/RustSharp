@@ -1,0 +1,22 @@
+using System;
+using System.Threading;
+delegate int F();
+[Once] delegate int Once();
+class C { public int V; }
+class P
+{
+    static int Take(C c) => c.V;
+    static void Main()
+    {
+        var a = new C();
+        F many = move () => Take(a); // error: CS9902
+
+        var b = new C();
+        Once one = move () => Take(b);
+        one();
+        one(); // error: CS9900
+
+        var c = new C();
+        Once borrowing = () => Take(c); // error: CS9902
+    }
+}

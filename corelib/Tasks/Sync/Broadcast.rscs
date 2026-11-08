@@ -1,0 +1,37 @@
+using System.Collections.Generic;
+using System.Threading;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>Every subscriber gets every value: tokio::sync::broadcast. Values must be Clone.</summary>
+    [SendWhen(Bound.Send), SyncWhen(Bound.Send)]
+    public struct Broadcast<T> : IClone<Broadcast<T>>
+    {
+        private Arc<Mutex<List<Sender<T>>>> _subscribers;
+
+        public Broadcast() { _subscribers = new Arc<Mutex<List<Sender<T>>>>(new Mutex<List<Sender<T>>>(new List<Sender<T>>())); }
+        private Broadcast(Arc<Mutex<List<Sender<T>>>> subscribers) { _subscribers = subscribers; }
+        public readonly Broadcast<T> Clone() => new Broadcast<T>(_subscribers.Clone());
+
+        public readonly Receiver<T> Subscribe()
+        {
+            var (tx, rx) = Channel.Create<T>();
+            var g = _subscribers.Value.Lock();
+            g.Value.Add(tx);
+            return rx;
+        }
+
+        public readonly void Send(in T value)
+        {
+            var g = _subscribers.Value.Lock();
+            for (int i = 0; i < g.Value.Count; i++) g.Value.At(i).Send(Mem.CloneOf(in value));
+        }
+
+        /// <summary>Ends the stream for all subscribers.</summary>
+        public readonly void Close()
+        {
+            var g = _subscribers.Value.Lock();
+            g.Value.Clear();
+        }
+    }
+}

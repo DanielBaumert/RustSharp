@@ -1,0 +1,49 @@
+namespace System
+{
+    /// <summary>Rust's &amp;str methods. Those that cut return a str into the same bytes.</summary>
+    public readonly unsafe partial struct str
+    {
+        private static bool Space(byte b) => b == ' ' || (b >= 9 && b <= 13);
+
+        public str Trim() => TrimRange(true, true);
+        public str TrimStart() => TrimRange(true, false);
+        public str TrimEnd() => TrimRange(false, true);
+
+        private str TrimRange(bool start, bool end)
+        {
+            int a = 0, b = _length;
+            if (start) while (a < b && Space(_p[a])) a++;
+            if (end) while (b > a && Space(_p[b - 1])) b--;
+            return new str(_p + a, b - a);
+        }
+
+        public int IndexOf(str needle)
+        {
+            for (int i = 0; i + needle._length <= _length; i++)
+                if (Libc.memcmp(_p + i, needle._p, needle._length) == 0) return i;
+            return -1;
+        }
+
+        public Option<int> Find(str needle)
+        {
+            int i = IndexOf(needle);
+            return i < 0 ? Option<int>.None : Option<int>.Some(i);
+        }
+
+        public bool Contains(str needle) => IndexOf(needle) >= 0;
+        public bool StartsWith(str prefix) => prefix._length <= _length && Libc.memcmp(_p, prefix._p, prefix._length) == 0;
+        public bool EndsWith(str suffix) => suffix._length <= _length && Libc.memcmp(_p + _length - suffix._length, suffix._p, suffix._length) == 0;
+
+        /// <summary>The parts between separators, lazily: Rust's split().</summary>
+        public System.Linq.Query<str, Text.SplitIter> Split(char separator) => new System.Linq.Query<str, Text.SplitIter>(new Text.SplitIter(this, separator));
+
+        /// <summary>Split by a str. The parts live as long as both the text and the separator, like Rust's Split<'a>.</summary>
+        public System.Linq.Query<str, Text.SplitIter> Split(str separator) => new System.Linq.Query<str, Text.SplitIter>(new Text.SplitIter(this, separator, false));
+
+        /// <summary>The lines without their `\n` or `\r\n`: Rust's lines().</summary>
+        public System.Linq.Query<str, Text.SplitIter> Lines() => new System.Linq.Query<str, Text.SplitIter>(new Text.SplitIter(this, default, true));
+
+        /// <summary>Rust's parse::&lt;i32&gt;() on a str.</summary>
+        public Result<int, ParseError> ParseInt() => int.Parse(ToString());
+    }
+}

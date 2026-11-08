@@ -1,0 +1,45 @@
+using System;
+enum Shape
+{
+    Circle(double R),
+    Rect(double W, double H),
+    Empty,
+}
+enum Tree
+{
+    Leaf(int V),
+    Node(Tree Left, Tree Right),
+}
+class P
+{
+    static double Missing(Shape s) => s switch // error: CS8509
+    {
+        Shape.Circle(var r) => r,
+        Shape.Empty => 0,
+    };
+
+    static double Refutable(Shape s) => s switch // error: CS8509
+    {
+        Shape.Circle(> 0) => 1,
+        Shape.Rect(var w, var h) => w * h,
+        Shape.Empty => 0,
+    };
+
+    static void Statement(Shape s)
+    {
+        switch (s) // error: CS8509
+        {
+            case Shape.Circle(var r):
+                Console.WriteLine(r);
+                break;
+        }
+    }
+
+    static double Fine(Shape s) => s switch
+    {
+        Shape.Circle(var r) => r,
+        _ => 0,
+    };
+
+    static void Main() { }
+}

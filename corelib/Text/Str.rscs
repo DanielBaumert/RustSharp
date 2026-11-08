@@ -1,0 +1,61 @@
+namespace System
+{
+    /// <summary>
+    /// Rust's &amp;str: a borrowed view of UTF-8 bytes, Copy, without its own copy of the text. A string
+    /// turns into one implicitly; a literal becomes a 'static str on the program's own bytes.
+    /// </summary>
+    [Reference]
+    public readonly unsafe partial struct str
+    {
+        private readonly byte* _p;
+        private readonly int _length;
+        internal str(byte* p, int length) { _p = p; _length = length; }
+
+        public static implicit operator str(in string s) => new str(s.Bytes0, s.Length);
+
+        public int Length => _length;
+        public bool IsEmpty => _length == 0;
+        internal byte* Data => _p;
+
+        /// <summary>A String with the same text: Rust's to_string() and to_owned().</summary>
+        public override string ToString() => String.FromUtf8(_p, _length);
+        public string ToOwned() => String.FromUtf8(_p, _length);
+
+        public static bool operator ==(str a, str b) => a._length == b._length && Libc.memcmp(a._p, b._p, a._length) == 0;
+        public static bool operator !=(str a, str b) => !(a == b);
+        public override bool Equals(object o) => false;
+        public override int GetHashCode()
+        {
+            int h = 17;
+            for (int i = 0; i < _length; i++) h = h * 31 + _p[i];
+            return h;
+        }
+
+        private void CheckBoundary(int i)
+        {
+            if (i < 0 || i > _length) Panic.Raise("byte index " + i.ToString() + " is out of bounds of the str");
+            if (i < _length && (_p[i] & 0xC0) == 0x80) Panic.Raise("byte index " + i.ToString() + " is not a char boundary");
+        }
+
+        /// <summary>Bytes from `start`, `length` long, on char boundaries: `&amp;s[start..start + length]`, also as s[a..b].</summary>
+        public str Slice(int start, int length)
+        {
+            CheckBoundary(start);
+            CheckBoundary(start + length);
+            return new str(_p + start, length);
+        }
+
+        public str this[Range range]
+        {
+            get
+            {
+                int start = range.Start.GetOffset(_length), end = range.End.GetOffset(_length);
+                if (end < start) Panic.Raise("slice index starts at " + start.ToString() + " but ends at " + end.ToString());
+                return Slice(start, end - start);
+            }
+        }
+
+        public System.Linq.Query<Rune, Text.CharsIter> Chars() => new System.Linq.Query<Rune, Text.CharsIter>(new Text.CharsIter(_p, _length));
+        public System.Linq.Query<byte, System.Linq.SliceIter<byte>> Bytes() => new System.Linq.Query<byte, System.Linq.SliceIter<byte>>(new System.Linq.SliceIter<byte>(_p, _length));
+    }
+}

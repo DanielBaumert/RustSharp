@@ -1,0 +1,17 @@
+using System.Collections.Generic;
+class C { public int V; public IEnumerable<int> Each() { yield return V; } }
+class P
+{
+    static IEnumerable<int> Gen() { yield return 1; }
+    static void Main()
+    {
+        mut var c = new C();
+        var it = c.Each();
+        c = new C(); // error: CS9907
+        foreach (var x in it) { }
+
+        var g = Gen();
+        foreach (var x in g) { }
+        foreach (var y in g) { } // error: CS9900
+    }
+}

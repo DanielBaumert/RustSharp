@@ -1,0 +1,23 @@
+using System.Collections.Generic;
+using System.Threading;
+
+namespace System.Threading.Tasks
+{
+    [SendWhen(Bound.Send), SyncWhen(Bound.Send)]
+    public unsafe struct AsyncGuard<T>
+    {
+        private WaitState* _s;
+        private Arc<Mutex<T>> _value;
+        internal AsyncGuard(WaitState* s, Arc<Mutex<T>> value) { _s = s; _value = value; }
+
+        /// <summary>The guarded value. Only one guard exists at a time, so this access is exclusive.</summary>
+        public ref T Value => ref _value.Value.Unguarded();
+
+        ~AsyncGuard()
+        {
+            if (_s == null) return;
+            WaitState.Give(_s);
+            WaitState.Release(_s);
+        }
+    }
+}

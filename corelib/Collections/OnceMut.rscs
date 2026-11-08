@@ -1,0 +1,18 @@
+namespace System
+{
+    /// <summary>Zero or one element that foreach may change: Result.IterMut.</summary>
+    public unsafe ref struct OnceMut<T>
+    {
+        private T* _p;
+        private bool _started;
+        internal OnceMut(T* p) { _p = p; _started = false; }
+        public move OnceMut<T> GetEnumerator() => new OnceMut<T>(_p);
+        public bool MoveNext()
+        {
+            if (_started || _p == null) return false;
+            _started = true;
+            return true;
+        }
+        public readonly ref T Current => ref *_p;
+    }
+}

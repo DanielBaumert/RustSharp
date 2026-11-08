@@ -1,0 +1,7 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>The marker an aborted task finishes with; JoinError reports it as IsCancelled.</summary>
+    internal sealed class Cancelled : Exception { public Cancelled() : base("task was cancelled") { } }
+}

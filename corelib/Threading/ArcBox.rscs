@@ -1,0 +1,11 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    internal unsafe struct ArcBox<T>
+    {
+        public long Strong;
+        public long Weak;
+        public T Value;
+    }
+}

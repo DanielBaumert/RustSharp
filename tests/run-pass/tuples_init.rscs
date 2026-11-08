@@ -1,0 +1,22 @@
+using System;
+using System.Collections.Generic;
+class C { public int V = 3; public C() { } ~C() { Console.WriteLine("drop c"); } }
+struct S { public int W; }
+class P
+{
+    static (int, string) Pair() => (1, "one");
+    static T Make<T>() where T : new() => new T();
+    static void Main()
+    {
+        var t = (2, "two");
+        Console.WriteLine(t.Item1);
+        Console.WriteLine(t.Item2);
+        var (n, s) = Pair();
+        Console.WriteLine(s + n.ToString());
+        var l = new List<int> { 1, 2, 3 };
+        Console.WriteLine(l.Count);
+        var c = Make<C>();
+        Console.WriteLine(c.V);
+        Console.WriteLine(Make<S>().W);
+    }
+}

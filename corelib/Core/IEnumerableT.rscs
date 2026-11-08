@@ -1,0 +1,12 @@
+namespace System.Collections.Generic
+{
+    [BorrowHolder] public interface IEnumerator<T> : IEnumerator, IDisposable { new T Current { get; } }
+    // Iterating consumes the sequence, like Rust's IntoIterator.
+    [BorrowHolder] public interface IEnumerable<T> : IEnumerable { new move IEnumerator<T> GetEnumerator(); }
+
+    [BorrowHolder] public interface IAsyncEnumerator<T> : IAsyncDisposable
+    {
+        System.Threading.Tasks.ValueTask<bool> MoveNextAsync();
+        T Current { get; }
+    }
+}

@@ -1,0 +1,27 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    internal static unsafe class Listeners
+    {
+        public static Result<int, IoError> Open(Sockaddr* a)
+        {
+            int fd = Sys.socket(a->Family, 0x80801, 0); // SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC
+            if (fd < 0) return Result<int, IoError>.Err(new IoError(Address.ErrorText("socket")));
+            int one = 1;
+            if (a->Family != 1) Sys.setsockopt(fd, 1, 2, &one, 4); // SO_REUSEADDR
+            if (Sys.bind(fd, a, (uint)a->Length) != 0)
+            {
+                string error = Address.ErrorText("bind");
+                Sys.close(fd);
+                return Result<int, IoError>.Err(new IoError(error));
+            }
+            if (Sys.listen(fd, 1024) != 0) return Result<int, IoError>.Err(new IoError(Address.ErrorText("listen")));
+            return Result<int, IoError>.Ok(fd);
+        }
+    }
+}

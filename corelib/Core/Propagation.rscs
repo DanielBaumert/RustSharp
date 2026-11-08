@@ -1,0 +1,17 @@
+namespace System
+{
+    /// <summary>The `?` operator. The compiler replaces Propagate with a branch and an early return.</summary>
+    public static class Propagation
+    {
+        public static extern T Propagate<T, E>(Result<T, E> value);
+        public static extern T Propagate<T>(Option<T> value);
+
+        public static bool Failed<T, E>(in Result<T, E> r) => r.IsErr;
+        public static bool Failed<T>(in Option<T> o) => o.IsNone;
+        public static T ValueOf<T, E>(Result<T, E> r) => r.Unwrap();
+        public static T ValueOf<T>(Option<T> o) => o.Unwrap();
+        public static E ErrorOf<T, E>(Result<T, E> r) => r.UnwrapErr();
+        public static Result<U, E> Fail<U, E>(E error) => Result<U, E>.Err(error);
+        public static Option<U> NoneOf<T, U>(Option<T> o) => Option<U>.None;
+    }
+}

@@ -1,0 +1,23 @@
+using System;
+interface IGreet
+{
+    readonly string Name();
+    readonly string Hello() => "Hello " + Name();
+}
+[Copy] struct Point : IDefault<Point> { public int X; public static Point Default() => new Point { X = 7 }; }
+class A : IGreet { public readonly string Name() => "A"; }
+class B : IGreet { public readonly string Name() => "B"; public readonly string Hello() => "Hi B"; }
+class P
+{
+    static string Say<T>(in T x) where T : IGreet => x.Hello();
+    static T Make<T>() where T : IDefault<T> => T.Default();
+    static void Main()
+    {
+        IGreet a = new A();
+        Console.WriteLine(a.Hello());
+        var b = new B();
+        Console.WriteLine(Say(in b));
+        Console.WriteLine(Say(in a));
+        Console.WriteLine(Make<Point>().X);
+    }
+}

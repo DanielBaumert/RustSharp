@@ -1,0 +1,22 @@
+namespace System.Linq
+{
+    public unsafe ref struct SelectManyIter<T, U, I> : IIter<U> where I : IIter<T>, allows ref struct
+    {
+        private I _inner;
+        private Selector<T, System.Collections.Generic.List<U>> _map;
+        private Option<System.Collections.Generic.List<U>> _current;
+        private int _i;
+        internal SelectManyIter(I inner, Selector<T, System.Collections.Generic.List<U>> map) { _inner = inner; _map = map; _current = Option<System.Collections.Generic.List<U>>.None; }
+        public U* Next()
+        {
+            while (_current.IsNone || _i >= _current.Slot.Count)
+            {
+                T* item = _inner.Next();
+                if (item == null) return null;
+                _current = Option<System.Collections.Generic.List<U>>.Some(_map(in *item));
+                _i = 0;
+            }
+            return _current.Slot.Data + _i++;
+        }
+    }
+}

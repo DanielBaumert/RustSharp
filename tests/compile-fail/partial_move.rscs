@@ -1,0 +1,13 @@
+class A { }
+class H { public A X = new A(); public A Y = new A(); }
+class P
+{
+    static void Take(H h) { }
+    static void Main()
+    {
+        var h = new H();
+        var x = h.X;
+        var y = h.Y;
+        Take(h); // error: CS9900
+    }
+}

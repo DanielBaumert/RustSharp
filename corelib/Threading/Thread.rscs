@@ -1,0 +1,54 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    /// <summary>A running thread. Join hands back what the thread produced.</summary>
+    public unsafe class Thread<T>
+    {
+        private ulong _id;
+        private ThreadPacket<T>* _packet;
+        private bool _joined;
+
+        internal Thread('static ThreadWork<T> work)
+        {
+            _packet = (ThreadPacket<T>*)Libc.calloc(1, Mem.SizeOf<ThreadPacket<T>>());
+            Mem.Write(Mem.AddressOf(in _packet->Work), Option<ThreadWork<T>>.Some(work));
+            ulong id;
+            Pthread.pthread_create(&id, null, &Entry, _packet);
+            _id = id;
+        }
+
+        private static void* Entry(void* raw)
+        {
+            var packet = (ThreadPacket<T>*)raw;
+            ThreadWork<T> work = packet->Work.Take().Unwrap();
+            Startup.s_threadName = 1;
+            try
+            {
+                packet->Result = Option<T>.Some(work());
+            }
+            catch (Exception e)
+            {
+                Startup.Report(ref e);
+                packet->Error = Option<Exception>.Some(e);
+            }
+            return null;
+        }
+
+        /// <summary>Waits for the thread: Err if it panicked, like Rust's JoinHandle::join.</summary>
+        public move Result<T, JoinError> Join()
+        {
+            _joined = true;
+            Pthread.pthread_join(_id, null);
+            if (_packet->Error.Take() is Some(var error)) return Result<T, JoinError>.Err(JoinError.From(error));
+            return Result<T, JoinError>.Ok(_packet->Result.Take().Unwrap());
+        }
+
+        ~Thread()
+        {
+            if (!_joined) Pthread.pthread_join(_id, null);
+            Mem.DropInPlace(_packet);
+            Libc.free(_packet);
+        }
+    }
+}

@@ -1,0 +1,35 @@
+using System;
+interface IShape { }
+class Circle : IShape { public int R = 3; ~Circle() { Console.WriteLine("drop circle"); } }
+class Rect : IShape { public int W = 4; public int H = 5; }
+class P
+{
+    static int Area(in IShape s)
+    {
+        if (s is Circle c) return c.R * c.R * 3;
+        if (s is Rect r) return r.W * r.H;
+        return 0;
+    }
+    static string Name(in IShape s) => s switch
+    {
+        Circle => "circle",
+        Rect { W: 4 } => "rect4",
+        _ => "other"
+    };
+    static void Main()
+    {
+        mut IShape a = new Circle();
+        IShape b = new Rect();
+        Console.WriteLine(Area(in a));
+        Console.WriteLine(Area(in b));
+        Console.WriteLine(Name(in a));
+        Console.WriteLine(Name(in b));
+        if (a is Circle c) Console.WriteLine(c.R);
+        Console.WriteLine(a is Rect);
+        object o = 5;
+        if (o is int i) Console.WriteLine(i + 1);
+        string s = "text";
+        mut object so = s;
+        if (so is string t) Console.WriteLine(t);
+    }
+}

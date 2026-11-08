@@ -1,0 +1,15 @@
+namespace System
+{
+    public readonly partial struct Int64
+    {
+        public const long MaxValue = 9223372036854775807;
+        public const long MinValue = -9223372036854775808;
+        public override string ToString() => Number.Format(this);
+        public override int GetHashCode() => (int)this ^ (int)(this >> 32);
+        public static Result<long, ParseError> Parse(string s)
+        {
+            if (!Number.TryParse(s, out long v)) return Result<long, ParseError>.Err(new ParseError("invalid digit found in string"));
+            return Result<long, ParseError>.Ok(v);
+        }
+    }
+}

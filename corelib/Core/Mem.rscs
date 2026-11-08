@@ -1,0 +1,64 @@
+namespace System
+{
+    /// <summary>Low-level ownership primitives. The extern members are compiler intrinsics.</summary>
+    public static unsafe class Mem
+    {
+        /// <summary>Bitwise read: the caller now owns the value, and must not drop the source.</summary>
+        public static extern T Read<T>(T* p);
+        /// <summary>Bitwise write: whatever <paramref name="p"/> held is not dropped.</summary>
+        public static extern void Write<T>(T* p, T value);
+        public static extern void DropInPlace<T>(T* p);
+        /// <summary>Takes ownership of a value and never runs its destructor.</summary>
+        public static extern void Forget<T>(T value);
+        public static extern bool NeedsDrop<T>();
+        public static extern int SizeOf<T>();
+        /// <summary>Where user code was at its last call or fault, as "file:line:column".</summary>
+        public static extern string PanicLocation();
+        /// <summary>Starts a panic with this payload; destructors run while it unwinds. Panic.Raise uses it.</summary>
+        public static extern void Unwind(object payload);
+        /// <summary>A literal as a 'static str on the program's own bytes; the compiler emits it for `str s = "…"`.</summary>
+        public static extern str StaticStr(string literal);
+        public static extern string TypeNameOf(in object value);
+        public static extern To Transmute<From, To>(From value);
+        public static extern T* AddressOf<T>(in T value);
+        public static extern ref T AsRef<T>(T* p);
+        public static extern T CloneOf<T>(in T value);
+        public static extern int HashOf<T>(in T value);
+        public static extern bool EqualOf<T>(in T a, in T b);
+        public static extern int CompareOf<T>(in T a, in T b);
+        /// <summary>A compile-time bound: reports an error if T is not Send.</summary>
+        public static extern void RequireSend<T>();
+        /// <summary>A compile error unless T is Copy.</summary>
+        public static extern void RequireCopy<T>();
+
+        public static void Swap<T>(ref T a, ref T b)
+        {
+            T* pa = AddressOf(in a);
+            T* pb = AddressOf(in b);
+            T t = Read(pa);
+            Write(pa, Read(pb));
+            Write(pb, t);
+        }
+
+        /// <summary>Stores a new value and returns the old one, without ever leaving the slot empty.</summary>
+        public static T Replace<T>(ref T slot, T value)
+        {
+            T* p = AddressOf(in slot);
+            T old = Read(p);
+            Write(p, value);
+            return old;
+        }
+
+        /// <summary>Rust's mem::take: moves the value out and leaves the type's Default behind, never a null.</summary>
+        public static T Take<T>(ref T slot) where T : IDefault<T> => Replace(ref slot, T.Default());
+
+        /// <summary>
+        /// Rust's Box::new_uninit_slice: an array whose elements are not values yet. Every element must be
+        /// written with Mem.Write before anything reads it. Only the core library builds arrays this way.
+        /// </summary>
+        internal static extern T[] UninitArray<T>(int length);
+
+        /// <summary>Runs the destructor now by taking ownership and letting the value go out of scope.</summary>
+        public static void Drop<T>(T value) { }
+    }
+}

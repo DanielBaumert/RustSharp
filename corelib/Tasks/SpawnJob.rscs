@@ -1,0 +1,38 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    internal sealed unsafe class SpawnJob<T> : IJob
+    {
+        private Option<AsyncWork<T>> _work;
+        private Option<Task<T>> _task = Option<Task<T>>.None;
+        private SharedResult<T> _shared;
+
+        public SpawnJob('static AsyncWork<T> work, SharedResult<T> shared) { _work = Option<AsyncWork<T>>.Some(work); _shared = shared; }
+
+        public bool Step()
+        {
+            if (_shared.AbortRequested)
+            {
+                _task = Option<Task<T>>.None;
+                _shared.Finish(Option<T>.None, Option<Exception>.Some(new Cancelled()));
+                return true;
+            }
+            // The boundary of a task, like tokio's: a panic ends this task only, and its handle reports it.
+            try
+            {
+                if (_task.IsNone) _task = Option<Task<T>>.Some(Mem.Transmute<Task<T>, Task<T>>(_work.Take().Unwrap()()));
+                if (!_task.SlotMut.Poll()) return false;
+            }
+            catch (Exception panic)
+            {
+                _task = Option<Task<T>>.None;
+                _shared.Finish(Option<T>.None, Option<Exception>.Some(panic));
+                return true;
+            }
+            T value = _task.SlotMut.TakeResult();
+            _shared.Finish(Option<T>.Some(value), Option<Exception>.None);
+            return true;
+        }
+    }
+}

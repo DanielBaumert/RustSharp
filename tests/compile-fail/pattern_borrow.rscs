@@ -1,0 +1,20 @@
+interface IA { }
+class B : IA { public int V; }
+class P
+{
+    static void Main()
+    {
+        mut IA a = new B();
+        if (a is B b)
+        {
+            var gone = a; // error: CS9906
+            b.V = 1;
+        }
+        mut IA a2 = new B();
+        if (a2 is B c)
+        {
+            IA escape = c; // error: CS9902
+        }
+        if (a is B again) { } // error: CS9901
+    }
+}

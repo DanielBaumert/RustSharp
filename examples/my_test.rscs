@@ -1,0 +1,19 @@
+using System;
+using System.Collections.Generic;
+
+class Program
+{
+    static void Main()
+    {
+        mut int a = 42;
+        int b = 5;
+
+        var c = Add(a, b);
+        Console.WriteLine(c);
+
+        a++;
+        Console.WriteLine(a);
+    }
+
+    static int Add(int x, int y) => x + y;
+}

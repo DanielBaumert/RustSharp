@@ -1,0 +1,117 @@
+using System;
+using System.Collections.Generic;
+delegate int F(int x);
+[Mut] delegate void G();
+delegate string S();
+class Res { public int V = 4; ~Res() { Console.WriteLine("res dropped"); } }
+class Counter
+{
+    int _n;
+    public int Value { get => _n; }
+    public void Bump() { _n++; }
+    public void Twice()
+    {
+        mut G g = () => { _n += 2; };
+        g();
+        g();
+        Console.WriteLine(_n);
+    }
+    public int Read(int add)
+    {
+        F f = x => x + _n + add;
+        return f(1);
+    }
+}
+class Holder
+{
+    F _f;
+    public Holder('static F f) { _f = f; }
+    public int Call(int x) => _f(x);
+}
+class P
+{
+    static int Apply(in F f, int x) => f(x);
+    static int ApplyOwned(F f, int x) => f(x);
+    static F Make(int n) => move x => x + n;
+    static void Main()
+    {
+        mut int a = 1, b = 2;
+        // Each closure borrows only what it uses, so these two do not conflict.
+        mut G incA = () => { a++; };
+        mut G incB = () => { b += 10; };
+        incA();
+        incB();
+        incA();
+        Console.WriteLine(a + b);
+        a = 100;
+
+        // Shared captures can coexist with reads.
+        int limit = 5;
+        F under = x => x < limit ? 1 : 0;
+        F over = x => x > limit ? 1 : 0;
+        Console.WriteLine(limit + under(1) + over(1));
+
+        Console.WriteLine(Apply(in under, 9));
+        Console.WriteLine(ApplyOwned(x => x * limit, 2));
+
+        // A move closure owns its captures.
+        var r = new Res();
+        F owned = move x => x + r.V;
+        Console.WriteLine(owned(1));
+        Console.WriteLine(Make(3)(4));
+        mut var h = new Holder(move x => x + 1);
+        Console.WriteLine(h.Call(1));
+        string name = "n";
+        S greet = () => name + "!";
+        Console.WriteLine(greet());
+        Console.WriteLine(name);
+
+        mut var c = new Counter();
+        c.Twice();
+        Console.WriteLine(c.Read(10));
+        {
+            int outer = 1;
+            {
+                int inner = 2;
+                F both = x => x + outer + inner;
+                Console.WriteLine(both(3));
+            }
+        }
+        mut var list = new List<F>();
+        list.Add(move x => x + 2);
+        list.Add(Make(5));
+        Console.WriteLine(list[1](1));
+        Console.WriteLine(OnceTest.Run());
+        Console.WriteLine(NestedMove.Run());
+        Console.WriteLine("end");
+    }
+}
+[Once] delegate int OnceF();
+class OnceTest
+{
+    public static int Take(Res r) => r.V;
+    public static int Run()
+    {
+        var r = new Res();
+        OnceF f = move () => Take(r);
+        return f();
+    }
+}
+class NestedMove
+{
+    delegate int F2();
+    public static int Run()
+    {
+        mut int total = 0;
+        int outer = 40;
+        mut var fs = new System.Collections.Generic.List<F2>();
+        for (mut int i = 0; i < 3; i++)
+        {
+            int inner = i;
+            string tag = "t" + i.ToString();
+            fs.Add(move () => outer + inner + tag.Length);
+        }
+        for (mut int i = 0; i < 3; i++) total += fs[i]();
+        return total + outer;
+    }
+}

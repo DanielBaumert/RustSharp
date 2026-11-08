@@ -1,0 +1,33 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    internal sealed unsafe class AsyncStep<T> : Task<bool>
+    {
+        private void* _frame;
+        private delegate*<void*, void*, int> _resume;
+        private Option<T>* _slot;
+        private bool* _finished;
+
+        public AsyncStep(void* frame, delegate*<void*, void*, int> resume, Option<T>* slot, bool* finished)
+        {
+            _frame = frame;
+            _resume = resume;
+            _slot = slot;
+            _finished = finished;
+        }
+
+        internal override bool PollCore()
+        {
+            if (*_finished) return true;
+            ref Option<T> current = ref Mem.AsRef(_slot);
+            current = Option<T>.None; // drops an element nobody took
+            int code = _resume(_frame, current.UninitSlot());
+            if (code == 0) return false;
+            if (code == 1) *_finished = true;
+            else current.AssumeSome(); // 2: the coroutine wrote the next element
+            _result = Some(code == 2);
+            return true;
+        }
+    }
+}

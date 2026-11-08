@@ -1,0 +1,24 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    /// <summary>Owns a file descriptor. Tasks share it, so it stays open until the last one is done.</summary>
+    internal sealed class SocketHandle
+    {
+        public int Fd;
+        public SocketHandle(int fd) { Fd = fd; }
+        ~SocketHandle() { Reactor.Close(Fd); }
+    }
+
+    /// <summary>A socket address, as the kernel wants it.</summary>
+    internal unsafe struct Sockaddr
+    {
+        public long A, B, C, D, E, F, G, H, I, J, K, L, M, N;
+        public int Length;
+        public int Family;
+    }
+}

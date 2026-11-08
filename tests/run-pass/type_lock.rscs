@@ -1,0 +1,32 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+interface IAnimal { }
+class Dog : IAnimal { }
+struct Point { public int X; }
+enum Color { Red, Green }
+class P
+{
+    static string NameOf<T>() => typeof(T).Name;
+    static int Pick(Color c) => c switch { Color.Red => 1, Color.Green => 2 };
+    static readonly Lock s_lock = new Lock();
+    static void Main()
+    {
+        Console.WriteLine(typeof(int).FullName);
+        Console.WriteLine(typeof(Dog).Name);
+        Console.WriteLine(NameOf<string>());
+        Console.WriteLine(NameOf<List<Dog>>());
+        IAnimal a = new Dog();
+        Console.WriteLine(a.GetType().Name);
+        Console.WriteLine(a.GetType() == typeof(Dog));
+        Console.WriteLine(a.GetType() == typeof(IAnimal));
+        Console.WriteLine("x".GetType().FullName);
+        Point p = default;
+        Console.WriteLine(p.GetType().Name);
+        Console.WriteLine(Pick(Color.Green));
+        mut int n = 0;
+        lock (s_lock) { n++; }
+        lock (s_lock) { n++; }
+        Console.WriteLine(n);
+    }
+}

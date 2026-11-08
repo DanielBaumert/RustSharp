@@ -1,0 +1,19 @@
+// exit: 101
+using System;
+class P
+{
+    static void Main()
+    {
+        int a = 2147483640;
+        Console.WriteLine(unchecked(a + 100));
+        Console.WriteLine(checked(a + 7));
+        long big = 3000000000;
+        Console.WriteLine(unchecked((int)big));
+        int minus = -1;
+        Console.WriteLine(unchecked((uint)minus));
+        byte fits = checked((byte)(a - 2147483500));
+        Console.WriteLine(fits);
+        Console.WriteLine(checked((int)big));
+        Console.WriteLine("unreachable");
+    }
+}

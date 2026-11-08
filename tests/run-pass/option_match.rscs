@@ -1,0 +1,98 @@
+using System;
+using System.Collections.Generic;
+// Option<T> like Rust's: Some(v), None, matching, `?`, and Option<Ref<T>> borrows.
+class User
+{
+    public string Name;
+    public string? Email;
+    public User(string name, string? email) { Name = name; Email = email; }
+}
+
+class P
+{
+    // `T?` is a short way to write Option<T>, for structs and classes alike.
+    static int? ParseDigit(Rune c) => c.IsAsciiDigit ? Some((int)c.Value - '0') : None;
+
+    // `?` passes None on, like Rust's `?` on an Option.
+    static int? SumDigits(string s)
+    {
+        mut int sum = 0;
+        foreach (var c in s.Chars()) sum += ParseDigit(c)?;
+        return Some(sum);
+    }
+
+    static string Describe(in int? o) => o.AsRef() switch
+    {
+        Some(var v) => "Some(" + v.Value.ToString() + ")",
+        None => "None",
+    };
+
+    // The value comes out of a borrowed Option as a Ref, without moving.
+    static int NameLength(in User? u) => u.AsRef().Map(r => r.Value.Name.Length).UnwrapOr(0);
+
+    static string Domain(in User u) => u.Email.AsRef() switch
+    {
+        Some(var e) => e.Value.Substring(e.Value.IndexOf('@') + 1),
+        None => "-",
+    };
+
+    static void Main()
+    {
+        Console.WriteLine(Describe(ParseDigit('7')) + " " + Describe(ParseDigit('x')));
+        Console.WriteLine(Describe(SumDigits("1234")) + " " + Describe(SumDigits("12a4")));
+
+        // checks
+        int? some = Some(5);
+        Option<int> none = Option<int>.None;
+        Console.WriteLine(some.IsSome + " " + some.IsNone + " " + none.IsSome + " " + none.IsNone);
+
+        // combinators
+        Console.WriteLine(Some(4).Map(v => v * 10).Unwrap());
+        Console.WriteLine(Some(4).AndThen(v => v > 3 ? Some(v - 3) : Option<int>.None).UnwrapOr(-1));
+        Console.WriteLine(Option<int>.None.Map(v => v * 10).UnwrapOr(-1));
+        Console.WriteLine(Option<int>.None.UnwrapOrDefault() + Option<string>.None.UnwrapOrDefault().Length);
+
+        // patterns: is, switch statement, switch expression with a guard
+        if (ParseDigit('3') is Some(var three)) Console.WriteLine("three " + three.ToString());
+        if (ParseDigit('?') is not Some(var _)) Console.WriteLine("not a digit");
+        foreach (var c in "a1".Chars())
+        {
+            switch (ParseDigit(c))
+            {
+                case Some(var d) when d > 0: Console.WriteLine("digit " + d.ToString()); break;
+                case Some(var d): Console.WriteLine("zero"); break;
+                case None: Console.WriteLine("letter " + c.ToString()); break;
+            }
+        }
+        Console.WriteLine(ParseDigit('9') switch { Some(9) => "nine", Some(_) => "other", None => "none" });
+
+        // classes inside an Option
+        var ann = new User("ann", Some("ann@example.org"));
+        var bob = new User("bob", None);
+        Console.WriteLine(Domain(in ann) + " " + Domain(in bob));
+        User? nobody = None;
+        User? someone = Some(ann);
+        Console.WriteLine(NameLength(in someone) + " " + NameLength(in nobody));
+
+        // changing an Option in place
+        mut string? slot = None;
+        Console.WriteLine(slot.GetOrInsert("first"));
+        slot.AsMut().Unwrap().Value = "second";
+        var old = slot.Replace("third");
+        Console.WriteLine(old.Unwrap() + " " + slot.Take().Unwrap() + " " + slot.IsNone);
+
+        // collections hand out Options
+        mut var ages = new Dictionary<string, int>();
+        ages.Add("ann", 31);
+        Console.WriteLine(ages.Get("ann").Copied().UnwrapOr(0) + " " + ages.Get("bob").Copied().UnwrapOr(0));
+        mut var stack = new List<string>();
+        stack.Add("x");
+        while (stack.Pop() is Some(var top)) Console.WriteLine("popped " + top);
+        Console.WriteLine(stack.Pop().IsNone);
+
+        // stdin: one line at a time, None at the end
+        mut int lines = 0;
+        while (Console.ReadLine() is Some(var line)) { lines++; Console.WriteLine("read " + line); }
+        Console.WriteLine(lines);
+    }
+}

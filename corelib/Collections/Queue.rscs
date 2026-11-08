@@ -1,0 +1,51 @@
+namespace System.Collections.Generic
+{
+    /// <summary>Rust's VecDeque, used as a queue.</summary>
+    [SendWhen(Bound.Send), SyncWhen(Bound.Sync)]
+    [CarriesBorrows]
+    public unsafe class Queue<T>
+    {
+        private T* _items;
+        private int _head, _count, _capacity;
+
+        public readonly int Count => _count;
+
+        public void Enqueue(T item)
+        {
+            if (_count == _capacity)
+            {
+                int bigger = _capacity == 0 ? 8 : _capacity * 2;
+                var items = (T*)Libc.malloc((long)bigger * Mem.SizeOf<T>());
+                for (int i = 0; i < _count; i++) Mem.Write(items + i, Mem.Read(_items + (_head + i) % _capacity));
+                Libc.free(_items);
+                _items = items;
+                _head = 0;
+                _capacity = bigger;
+            }
+            Mem.Write(_items + (_head + _count) % _capacity, item);
+            _count++;
+        }
+
+        /// <summary>Rust's VecDeque::pop_front: None when the queue is empty.</summary>
+        public Option<T> Dequeue()
+        {
+            if (_count == 0) return Option<T>.None;
+            T item = Mem.Read(_items + _head);
+            _head = (_head + 1) % _capacity;
+            _count--;
+            return Option<T>.Some(item);
+        }
+
+        public readonly ref readonly T Peek()
+        {
+            if (_count == 0) Panic.Raise("the queue is empty");
+            return ref *(_items + _head);
+        }
+
+        ~Queue()
+        {
+            for (int i = 0; i < _count; i++) Mem.DropInPlace(_items + (_head + i) % _capacity);
+            Libc.free(_items);
+        }
+    }
+}

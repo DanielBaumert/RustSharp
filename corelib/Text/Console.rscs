@@ -1,0 +1,51 @@
+namespace System
+{
+    public static unsafe class Console
+    {
+        private static void Out(int fd, in string s)
+        {
+            int n;
+            byte* p = s.ToUtf8(out n);
+            Libc.write(fd, p, n);
+            Libc.free(p);
+        }
+
+        internal static void ErrorWrite(string s) { Out(2, in s); }
+
+        /// <summary>Rust's stdin().read_line: one line without its line feed, None at the end of the input.</summary>
+        public static Option<string> ReadLine()
+        {
+            var text = new System.Text.StringBuilder();
+            bool any = false;
+            byte b = 0;
+            while (Libc.read(0, &b, 1) == 1)
+            {
+                any = true;
+                if (b == 10) break;
+                text.AppendByte(b);
+            }
+            if (!any) return Option<string>.None;
+            string line = text.ToString();
+            if (line.Length > 0 && line.ByteAt(line.Length - 1) == '\r') return Option<string>.Some(line.Substring(0, line.Length - 1));
+            return Option<string>.Some(line);
+        }
+        public static void Write(string s) { Out(1, in s); }
+        public static void Write(int v) { Write(v.ToString()); }
+        public static void Write(long v) { Write(v.ToString()); }
+        public static void Write(double v) { Write(v.ToString()); }
+        public static void Write(char v) { Write(v.ToString()); }
+        public static void Write(bool v) { Write(v.ToString()); }
+        public static void WriteLine() { Write("\n"); }
+        public static void WriteLine(string s) { Out(1, in s); Write("\n"); }
+        public static void WriteLine(int v) { WriteLine(v.ToString()); }
+        public static void WriteLine(uint v) { WriteLine(v.ToString()); }
+        public static void WriteLine(long v) { WriteLine(v.ToString()); }
+        public static void WriteLine(ulong v) { WriteLine(v.ToString()); }
+        public static void WriteLine(double v) { WriteLine(v.ToString()); }
+        public static void WriteLine(char v) { WriteLine(v.ToString()); }
+        public static void WriteLine(bool v) { WriteLine(v.ToString()); }
+        // Replaces WriteLine(object): printing must borrow the value, not consume it.
+        public static void WriteLine<T>(in T value) { WriteLine(value.ToString()); }
+        public static void Write<T>(in T value) { Write(value.ToString()); }
+    }
+}

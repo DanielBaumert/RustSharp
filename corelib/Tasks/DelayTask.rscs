@@ -1,0 +1,25 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    internal sealed unsafe class DelayTask : Task
+    {
+        private int _ms;
+        private bool _armed;
+        private Arc<AtomicInt> _fired;
+        public DelayTask(int ms) { _ms = ms; }
+        internal override bool PollCore()
+        {
+            if (!_armed)
+            {
+                if (_ms <= 0) return true;
+                _armed = true;
+                // Shared with the timer, which may fire after this task was dropped.
+                _fired = new Arc<AtomicInt>(new AtomicInt(0));
+                System.Net.Sockets.Reactor.AddTimer(Runtime.NowMs() + _ms, Runtime.CurrentWaker(), _fired.Clone());
+                return false;
+            }
+            return _fired.Value.Value != 0;
+        }
+    }
+}

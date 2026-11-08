@@ -1,0 +1,45 @@
+using System.Collections.Generic;
+using System.Threading;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>The latest value for many observers: tokio::sync::watch.</summary>
+    [SendWhen(Bound.Send), SyncWhen(Bound.Send)]
+    public unsafe struct Watch<T> : IClone<Watch<T>>
+    {
+        private Arc<Mutex<WatchState<T>>> _state;
+        private long _seen;
+
+        public Watch(T value)
+        {
+            var s = new WatchState<T> { Value = value, Version = 1, Waiters = new List<Waker>() };
+            _state = new Arc<Mutex<WatchState<T>>>(new Mutex<WatchState<T>>(s));
+            _seen = 1;
+        }
+
+        private Watch(Arc<Mutex<WatchState<T>>> state, long seen) { _state = state; _seen = seen; }
+        public readonly Watch<T> Clone() => new Watch<T>(_state.Clone(), _seen);
+
+        public readonly void Set(T value)
+        {
+            var waiters = new List<Waker>();
+            {
+                var g = _state.Value.Lock();
+                g.Value.Value = value;
+                g.Value.Version++;
+                Mem.Swap(ref waiters, ref g.Value.Waiters);
+            }
+            for (int i = 0; i < waiters.Count; i++) waiters[i].Wake();
+        }
+
+        /// <summary>A clone of the current value.</summary>
+        public readonly T Get()
+        {
+            var g = _state.Value.Lock();
+            return Mem.CloneOf(in g.Value.Value);
+        }
+
+        /// <summary>Waits until the value is newer than the one this handle last saw.</summary>
+        public Task<int> ChangedAsync() => new WatchTask<T>(_state.Clone(), Mem.AddressOf(in _seen));
+    }
+}

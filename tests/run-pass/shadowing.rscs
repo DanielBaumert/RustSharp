@@ -1,0 +1,27 @@
+using System;
+class P
+{
+    static int Twice(int x)
+    {
+        var x = x * 2;   // shadows the parameter, like `let x = x * 2;`
+        return x;
+    }
+    static void Main()
+    {
+        var x = 5;
+        var x = x + 1;
+        Console.WriteLine(x);
+        {
+            var x = "inner";
+            Console.WriteLine(x);
+        }
+        Console.WriteLine(x);
+        string text = "  42 ";
+        var text = text.Trim();
+        var text = text.ParseInt().Unwrap();
+        Console.WriteLine(text + 1);
+        Console.WriteLine(Twice(4));
+        mut Func<int, int> f = y => { var y = y + 100; return y; };
+        Console.WriteLine(f(1));
+    }
+}

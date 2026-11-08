@@ -1,0 +1,14 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    public static unsafe class Thread
+    {
+        /// <summary>Starts a thread. Like `thread::spawn`, the closure must be Send and own its captures.</summary>
+        public static Thread<T> Run<T>('static ThreadWork<T> work) => new Thread<T>(work);
+        public static void Sleep(int milliseconds) { Pthread.usleep((uint)milliseconds * 1000); }
+        /// <summary>Identifies the calling thread.</summary>
+        public static long CurrentId => (long)Pthread.pthread_self();
+        public static int ProcessorCount => (int)Pthread.sysconf(84);
+    }
+}

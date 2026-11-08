@@ -1,0 +1,24 @@
+using System.Collections.Generic;
+using System.Threading;
+
+namespace System.Threading.Tasks
+{
+    internal sealed unsafe class WatchTask<T> : Task<int>
+    {
+        private Arc<Mutex<WatchState<T>>> _state;
+        private long* _seen;
+        public WatchTask(Arc<Mutex<WatchState<T>>> state, long* seen) { _state = state; _seen = seen; }
+        internal override bool PollCore()
+        {
+            var g = _state.Value.Lock();
+            if (g.Value.Version != *_seen)
+            {
+                *_seen = g.Value.Version;
+                _result = Some(0); // Rust's changed() gives (); 0 stands for it
+                return true;
+            }
+            g.Value.Waiters.Add(Runtime.CurrentWaker());
+            return false;
+        }
+    }
+}

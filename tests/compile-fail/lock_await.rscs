@@ -1,0 +1,15 @@
+using System.Threading;
+using System.Threading.Tasks;
+class P
+{
+    static readonly Lock s_lock = new Lock();
+    static async Task<int> Bad()
+    {
+        lock (s_lock)
+        {
+            await Task.Yield(); // error: CS1996
+        }
+        return 0;
+    }
+    static void Main() { }
+}

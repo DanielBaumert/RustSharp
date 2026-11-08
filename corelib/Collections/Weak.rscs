@@ -1,0 +1,30 @@
+namespace System
+{
+    [SendWhen(Bound.Never), SyncWhen(Bound.Never)]
+    public unsafe struct Weak<T> : IClone<Weak<T>>
+    {
+        private RcBox<T>* _p;
+        internal Weak(RcBox<T>* p) { _p = p; }
+
+        public readonly Weak<T> Clone()
+        {
+            _p->Weak++;
+            return new Weak<T>(_p);
+        }
+
+        /// <summary>The value, if it is still alive.</summary>
+        public readonly Option<Rc<T>> Upgrade()
+        {
+            if (_p->Strong == 0) return Option<Rc<T>>.None;
+            _p->Strong++;
+            return Option<Rc<T>>.Some(new Rc<T>(_p));
+        }
+
+        ~Weak()
+        {
+            if (_p == null) return;
+            _p->Weak--;
+            if (_p->Strong == 0 && _p->Weak == 0) Libc.free(_p);
+        }
+    }
+}

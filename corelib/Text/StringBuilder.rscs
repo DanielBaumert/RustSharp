@@ -1,0 +1,49 @@
+namespace System.Text
+{
+    [SendWhen(Bound.Always), SyncWhen(Bound.Always)]
+    public sealed unsafe class StringBuilder
+    {
+        private byte* _data;
+        private int _length;
+        private int _capacity;
+
+        public StringBuilder() { _capacity = 32; _data = (byte*)Libc.malloc(32); }
+        ~StringBuilder() { Libc.free(_data); }
+
+        public readonly int Length => _length;
+
+        private void Reserve(int extra)
+        {
+            if (_length + extra <= _capacity) return;
+            while (_capacity < _length + extra) _capacity *= 2;
+            _data = (byte*)Libc.realloc(_data, _capacity);
+        }
+
+        // Rust's push_str and push return (): there is no second owner to hand back for chaining.
+        public void Append(string s) { AppendRef(in s); }
+        public void Append(object o) { AppendRef(o.ToString()); }
+
+        public void AppendRef(in string s)
+        {
+            int n = s.Length;
+            Reserve(n);
+            Libc.memcpy(_data + _length, s.Bytes0, n);
+            _length += n;
+        }
+
+        public void Append(char c)
+        {
+            uint bytes = Rune.Encode(c, out int n);
+            Reserve(n);
+            for (int k = 0; k < n; k++) _data[_length++] = (byte)(bytes >> (8 * k));
+        }
+
+        internal void AppendByte(byte b)
+        {
+            Reserve(1);
+            _data[_length++] = b;
+        }
+
+        public override readonly string ToString() => String.FromUtf8(_data, _length);
+    }
+}

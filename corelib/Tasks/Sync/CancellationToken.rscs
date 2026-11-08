@@ -1,0 +1,8 @@
+using System.Collections.Generic;
+using System.Threading;
+
+namespace System.Threading
+{
+    /// <summary>Only here for the signature of GetAsyncEnumerator; an async iterator is cancelled by dropping it.</summary>
+    public struct CancellationToken { }
+}

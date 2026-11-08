@@ -1,0 +1,15 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    [SendWhen(Bound.Always), SyncWhen(Bound.Always)]
+    public unsafe class AtomicLong
+    {
+        private long _value;
+        public AtomicLong(long value) { _value = value; }
+        private readonly long* Slot => Mem.AddressOf(in _value);
+        public readonly long Value { get => Atomic.Load(Slot); }
+        public readonly void Set(long value) { Atomic.Store(Slot, value); }
+        public readonly long Add(long delta) => Atomic.Add(Slot, delta) + delta;
+    }
+}

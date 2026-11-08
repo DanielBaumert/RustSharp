@@ -1,0 +1,38 @@
+namespace System
+{
+    /// <summary>Rust's Box&lt;T&gt;: one owner, the value on the heap. Value is Deref and DerefMut.</summary>
+    public unsafe struct Box<T>
+    {
+        private T* _p;
+
+        public Box(T value)
+        {
+            _p = (T*)Libc.malloc(Mem.SizeOf<T>() == 0 ? 1 : Mem.SizeOf<T>());
+            Mem.Write(_p, value);
+        }
+
+        /// <summary>Deref: shared access to the boxed value.</summary>
+        public readonly ref readonly T Value => ref *_p;
+
+        /// <summary>DerefMut: changing the value needs the box exclusively, as in Rust.</summary>
+        public ref T ValueMut => ref *_p;
+
+        /// <summary>Takes the value back out of the box.</summary>
+        public move T Unbox()
+        {
+            T value = Mem.Read(_p);
+            Libc.free(_p);
+            _p = null;
+            return value;
+        }
+
+        public override readonly string ToString() => Value.ToString();
+
+        ~Box()
+        {
+            if (_p == null) return;
+            Mem.DropInPlace(_p);
+            Libc.free(_p);
+        }
+    }
+}

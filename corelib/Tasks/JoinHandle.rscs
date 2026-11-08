@@ -1,0 +1,18 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>A spawned task. Dropping the handle detaches it; Abort cancels it.</summary>
+    public sealed class JoinHandle<T> : JoinTask<T>
+    {
+        private Waker _job;
+        internal JoinHandle(SharedResult<T> shared, Waker job) : base(shared) { _job = job; }
+
+        /// <summary>Cancels the task at its next suspension. Awaiting the handle then throws.</summary>
+        public readonly void Abort()
+        {
+            _shared.RequestAbort();
+            _job.Wake();
+        }
+    }
+}

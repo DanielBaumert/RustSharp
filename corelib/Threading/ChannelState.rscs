@@ -1,0 +1,16 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    internal unsafe class ChannelState<T>
+    {
+        public void* Lock;
+        public void* Ready;
+        public System.Collections.Generic.Queue<T> Queue = new System.Collections.Generic.Queue<T>();
+        public long Senders;
+        public long References;
+        public long Capacity;
+        public Option<System.Threading.Tasks.Waker> Receiver = Option<System.Threading.Tasks.Waker>.None;
+        public System.Collections.Generic.List<System.Threading.Tasks.Waker> Blocked = new System.Collections.Generic.List<System.Threading.Tasks.Waker>();
+    }
+}

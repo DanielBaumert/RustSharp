@@ -1,0 +1,55 @@
+using System;
+using System.Collections.Generic;
+struct Point
+{
+    public int X;
+    public Point(int x) { X = x; }
+    public void Move() { X++; }
+    public readonly int Get() => X;
+}
+class Node { public int V; }
+class P
+{
+    static void Fill(out int r) { r = 1; }
+    static void Bump(ref int x) { x++; }
+    static int Twice(mut int x) { x *= 2; return x; }
+    static void Main()
+    {
+        int a = 1;
+        mut int b = 2;
+        b++;
+        int late;
+        if (a > 0) late = 1; else late = 2;
+        Console.WriteLine(late + Twice(a) + b);
+        var p = new Point(3);
+        Console.WriteLine(p.Get());
+        mut var q = p;
+        q.Move();
+        Console.WriteLine(q.Get());
+        var n = new Node { V = 4 };
+        Console.WriteLine(n.V);
+        mut var list = new List<int>();
+        list.Add(5);
+        Console.WriteLine(list[0]);
+        foreach (var x in list) Console.WriteLine(x);
+        foreach (mut var x in list) { x++; Console.WriteLine(x); }
+        for (mut int i = 0; i < 2; i++) { int y = i * 2; Console.WriteLine(y); }
+        Fill(out int o);
+        Console.WriteLine(o);
+        int declared;
+        Fill(out declared);
+        Console.WriteLine(declared);
+        Bump(ref b);
+        Console.WriteLine(b);
+        ref int r = ref b;
+        r = 10;
+        Console.WriteLine(b);
+        mut Func<int, int> add = (mut int v) => { v++; return v; };
+        Console.WriteLine(add(1));
+        var (first, second) = (1, 2);
+        Console.WriteLine(first + second);
+        int mut = 7;
+        Console.WriteLine(mut);
+        Console.WriteLine(mut is 7);
+    }
+}

@@ -1,0 +1,17 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    internal sealed unsafe class CoroutineTask : Task
+    {
+        private Coroutine _c;
+        public CoroutineTask(void* frame, delegate*<void*, void*, int> resume, delegate*<void*, void> drop)
+        {
+            _c.Frame = frame;
+            _c.Resume = resume;
+            _c.Drop = drop;
+        }
+        internal override bool PollCore() => _c.Resume(_c.Frame, null) == 1;
+        ~CoroutineTask() { _c.Drop(_c.Frame); }
+    }
+}

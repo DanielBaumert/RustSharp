@@ -1,0 +1,19 @@
+using System;
+class P
+{
+    static void Main()
+    {
+        // The reference is rebound before every use, so `x` is free at the top of the loop.
+        mut int x = 1;
+        mut int y = 2;
+        mut ref int r = ref x;
+        for (mut int i = 0; i < 2; i++)
+        {
+            int z = x;
+            r = ref y;
+            r = ref x;
+            r = z + 1;
+        }
+        Console.WriteLine(x);
+    }
+}

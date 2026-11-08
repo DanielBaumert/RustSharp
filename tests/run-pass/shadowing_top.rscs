@@ -1,0 +1,10 @@
+using System;
+
+int a = 10;
+{
+    int a = 20;
+    Console.WriteLine(a);
+}
+Console.WriteLine(a);
+var a = a * 3;
+Console.WriteLine(a);

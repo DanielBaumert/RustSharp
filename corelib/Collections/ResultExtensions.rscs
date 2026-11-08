@@ -1,0 +1,41 @@
+namespace System
+{
+    /// <summary>Rust's Result methods that need a nested type: transpose and flatten.</summary>
+    public static class ResultExtensions
+    {
+        /// <summary>Rust's unwrap_or_default: needs `T : IDefault<T>`, so an Err never becomes a null.</summary>
+        public static T UnwrapOrDefault<T, E>(this Result<T, E> r) where T : IDefault<T> => r.IsOk ? r.Unwrap() : T.Default();
+
+        /// <summary>Result&lt;Option&lt;T&gt;, E&gt; to Option&lt;Result&lt;T, E&gt;&gt;: Ok(None) becomes None.</summary>
+        public static Option<Result<T, E>> Transpose<T, E>(this Result<Option<T>, E> r)
+        {
+            if (r.IsErr) return Option<Result<T, E>>.Some(Result<T, E>.Err(r.UnwrapErr()));
+            var inner = r.Unwrap();
+            if (inner.IsNone) return Option<Result<T, E>>.None;
+            return Option<Result<T, E>>.Some(Result<T, E>.Ok(inner.Unwrap()));
+        }
+
+        /// <summary>Result&lt;Result&lt;T, E&gt;, E&gt; to Result&lt;T, E&gt;.</summary>
+        public static Result<T, E> Flatten<T, E>(this Result<Result<T, E>, E> r)
+            => r.IsOk ? r.Unwrap() : Result<T, E>.Err(r.UnwrapErr());
+
+        // Rust's cloned() and copied(): from a Result of a reference to a Result of a value.
+        public static Result<T, E> Cloned<T, E>(this Result<Ref<T>, E> r)
+            => r.IsOk ? Result<T, E>.Ok(Mem.CloneOf(in r.Unwrap().Value)) : Result<T, E>.Err(r.UnwrapErr());
+        public static Result<T, E> Cloned<T, E>(this Result<RefMut<T>, E> r)
+            => r.IsOk ? Result<T, E>.Ok(Mem.CloneOf(in r.Unwrap().Value)) : Result<T, E>.Err(r.UnwrapErr());
+
+        public static Result<T, E> Copied<[Copy] T, E>(this Result<Ref<T>, E> r) => r.Cloned();
+        public static Result<T, E> Copied<[Copy] T, E>(this Result<RefMut<T>, E> r) => r.Cloned();
+
+        // Rust's as_deref() and as_deref_mut(): references to what a smart pointer points at.
+        public static Result<Ref<T>, Ref<E>> AsDeref<T, E>(this in Result<Rc<T>, E> r)
+            => r.IsOk ? Result<Ref<T>, Ref<E>>.Ok(Ref<T>.Of(in r.OkSlot.Value)) : Result<Ref<T>, Ref<E>>.Err(Ref<E>.Of(in r.ErrSlot));
+        public static Result<Ref<T>, Ref<E>> AsDeref<T, E>(this in Result<System.Threading.Arc<T>, E> r)
+            => r.IsOk ? Result<Ref<T>, Ref<E>>.Ok(Ref<T>.Of(in r.OkSlot.Value)) : Result<Ref<T>, Ref<E>>.Err(Ref<E>.Of(in r.ErrSlot));
+        public static Result<Ref<T>, Ref<E>> AsDeref<T, E>(this in Result<Box<T>, E> r)
+            => r.IsOk ? Result<Ref<T>, Ref<E>>.Ok(Ref<T>.Of(in r.OkSlot.Value)) : Result<Ref<T>, Ref<E>>.Err(Ref<E>.Of(in r.ErrSlot));
+        public static Result<RefMut<T>, RefMut<E>> AsDerefMut<T, E>(this ref Result<Box<T>, E> r)
+            => r.IsOk ? Result<RefMut<T>, RefMut<E>>.Ok(RefMut<T>.Of(ref r.OkSlotMut.ValueMut)) : Result<RefMut<T>, RefMut<E>>.Err(RefMut<E>.Of(ref r.ErrSlotMut));
+    }
+}

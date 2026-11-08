@@ -1,0 +1,22 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+class P
+{
+    static void Main()
+    {
+        mut var nums = new List<int> { 1, 2, 3 };
+        var q = nums.Where(x => x > 1);
+        nums.Add(4); // error: CS9909
+        Console.WriteLine(q.Count());
+
+        mut int limit = 1;
+        var r = nums.Where(x => x > limit);
+        limit = 2; // error: CS9907
+        Console.WriteLine(r.Count());
+
+        var s = nums.AsQuery();
+        var a = s.Count();
+        var b = s.Count(); // error: CS9900
+    }
+}

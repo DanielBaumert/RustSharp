@@ -1,0 +1,10 @@
+using System;
+// exit: 101
+class P
+{
+    static void Main()
+    {
+        string word = "grüße";
+        Console.WriteLine(word.Substring(0, 3));
+    }
+}

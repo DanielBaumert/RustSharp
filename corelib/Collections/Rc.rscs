@@ -1,0 +1,45 @@
+namespace System
+{
+    /// <summary>Single-threaded reference counting, for data that really has several owners.</summary>
+    [SendWhen(Bound.Never), SyncWhen(Bound.Never)]
+    public unsafe struct Rc<T> : IClone<Rc<T>>
+    {
+        private RcBox<T>* _p;
+
+        public Rc(T value)
+        {
+            _p = (RcBox<T>*)Libc.malloc(Mem.SizeOf<RcBox<T>>());
+            _p->Strong = 1;
+            _p->Weak = 0;
+            Mem.Write(Mem.AddressOf(in _p->Value), value);
+        }
+
+        internal Rc(RcBox<T>* p) { _p = p; }
+
+        public readonly Rc<T> Clone()
+        {
+            _p->Strong++;
+            return new Rc<T>(_p);
+        }
+
+        public readonly long Count => _p->Strong;
+        public readonly long WeakCount => _p->Weak;
+        public readonly ref readonly T Value => ref _p->Value;
+
+        /// <summary>A reference that does not keep the value alive, which breaks reference cycles.</summary>
+        public readonly Weak<T> Downgrade()
+        {
+            _p->Weak++;
+            return new Weak<T>(_p);
+        }
+
+        ~Rc()
+        {
+            if (_p == null) return;
+            _p->Strong--;
+            if (_p->Strong != 0) return;
+            Mem.DropInPlace(Mem.AddressOf(in _p->Value));
+            if (_p->Weak == 0) Libc.free(_p);
+        }
+    }
+}

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "RustSharp",
+  "scopeName": "source.rscs",
+  "comment": "RustSharp is C# with Rust semantics. The C# grammar that ships with VS Code does the work; rustsharp.injection adds mut, move, lifetimes and the ? operator.",
+  "patterns": [{ "include": "source.cs" }]
+}

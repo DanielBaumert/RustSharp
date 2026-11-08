@@ -1,0 +1,39 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    [SendWhen(Bound.Send), SyncWhen(Bound.Never)]
+    public unsafe struct Receiver<T>
+    {
+        private ChannelState<T>* _s;
+        internal Receiver(ChannelState<T>* s) { _s = s; }
+
+        /// <summary>Waits for a value; None once the channel is empty and every sender is gone.</summary>
+        internal readonly Option<T> Next()
+        {
+            Pthread.pthread_mutex_lock((*_s).Lock);
+            ref ChannelState<T> s = ref Mem.AsRef(_s);
+            while (s.Queue.Count == 0 && s.Senders > 0)
+                Pthread.pthread_cond_wait(s.Ready, s.Lock);
+            var value = s.Queue.Dequeue();
+            var next = TakeBlocked(ref s);
+            Pthread.pthread_mutex_unlock(s.Lock);
+            next.Wake();
+            return value;
+        }
+
+        internal static Option<System.Threading.Tasks.Waker> TakeBlocked(ref ChannelState<T> s)
+            => s.Blocked.Count > 0 ? Option<System.Threading.Tasks.Waker>.Some(s.Blocked.RemoveAt(0)) : Option<System.Threading.Tasks.Waker>.None;
+
+        /// <summary>Tokio's recv: waits without blocking the thread; None once every sender is gone.</summary>
+        public readonly System.Threading.Tasks.Task<Option<T>> ReceiveAsync() => new ReceiveTask<T>(_s);
+
+        /// <summary>Rust's recv: Err once every sender is gone and the channel is empty.</summary>
+        public readonly Result<T, RecvError> Receive() => Next().OkOr(new RecvError());
+
+        ~Receiver()
+        {
+            if (_s != null) Sender<T>.Release(_s);
+        }
+    }
+}

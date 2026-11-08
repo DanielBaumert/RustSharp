@@ -1,0 +1,73 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    [SendWhen(Bound.Send), SyncWhen(Bound.Never)]
+    public unsafe struct Sender<T> : IClone<Sender<T>>
+    {
+        private ChannelState<T>* _s;
+        internal Sender(ChannelState<T>* s) { _s = s; }
+
+        internal static ChannelState<T>* NewState()
+        {
+            var s = (ChannelState<T>*)Libc.calloc(1, 8);
+            ChannelState<T> state = new ChannelState<T>();
+            state.Lock = Libc.malloc(64);
+            state.Ready = Libc.malloc(64);
+            Pthread.pthread_mutex_init(state.Lock, null);
+            Pthread.pthread_cond_init(state.Ready, null);
+            state.Senders = 1;
+            state.References = 2;
+            Mem.Write(s, state);
+            return s;
+        }
+
+        internal static void Release(ChannelState<T>* s)
+        {
+            Pthread.pthread_mutex_lock((*s).Lock);
+            long left = --Mem.AsRef(s).References;
+            Pthread.pthread_mutex_unlock((*s).Lock);
+            if (left != 0) return;
+            Pthread.pthread_mutex_destroy((*s).Lock);
+            Pthread.pthread_cond_destroy((*s).Ready);
+            Libc.free((*s).Lock);
+            Libc.free((*s).Ready);
+            Mem.DropInPlace(s);
+            Libc.free(s);
+        }
+
+        public readonly void Send(T value)
+        {
+            Pthread.pthread_mutex_lock((*_s).Lock);
+            Mem.AsRef(_s).Queue.Enqueue(value);
+            Pthread.pthread_cond_signal((*_s).Ready);
+            var waiter = Mem.AsRef(_s).Receiver.Take();
+            Pthread.pthread_mutex_unlock((*_s).Lock);
+            waiter.Wake();
+        }
+
+        /// <summary>Hands the value over, waiting for room in a bounded channel.</summary>
+        public readonly System.Threading.Tasks.Task<int> SendAsync(T value) => new SendTask<T>(_s, value);
+
+        public readonly Sender<T> Clone()
+        {
+            Pthread.pthread_mutex_lock((*_s).Lock);
+            Mem.AsRef(_s).Senders++;
+            Mem.AsRef(_s).References++;
+            Pthread.pthread_mutex_unlock((*_s).Lock);
+            return new Sender<T>(_s);
+        }
+
+        ~Sender()
+        {
+            if (_s == null) return;
+            Pthread.pthread_mutex_lock((*_s).Lock);
+            Mem.AsRef(_s).Senders--;
+            Pthread.pthread_cond_broadcast((*_s).Ready);
+            var waiter = Mem.AsRef(_s).Receiver.Take();
+            Pthread.pthread_mutex_unlock((*_s).Lock);
+            waiter.Wake();
+            Release(_s);
+        }
+    }
+}

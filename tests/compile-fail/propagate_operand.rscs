@@ -1,0 +1,6 @@
+using System;
+class P
+{
+    static Result<int, string> F() => Result<int, string>.Ok(3?); // error: CS9931
+    static void Main() { }
+}

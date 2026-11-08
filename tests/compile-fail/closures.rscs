@@ -1,0 +1,47 @@
+using System;
+using System.Collections.Generic;
+delegate int F();
+[Mut] delegate void G();
+class C { public int V; }
+class Keep { F _f = () => 0; public void Set(F f) { _f = f; } } // error: CS9915
+class P
+{
+    static F Escape(int n) { return () => n; } // error: CS9925
+    static F Stored = () => 0;
+    static void Main()
+    {
+        mut int a = 1;
+        mut G bump = () => { a++; };
+        int read = a; // error: CS9908
+        bump();
+
+        mut int b = 1;
+        F look = () => b;
+        b = 2; // error: CS9907
+        look();
+
+        mut int c = 1;
+        mut G one = () => { c++; };
+        mut G two = () => { c++; }; // error: CS9911
+        one();
+        two();
+
+        var moved = new C();
+        F m = move () => moved.V;
+        Console.WriteLine(moved.V); // error: CS9900
+
+        // Like Vec<Box<dyn Fn() + 'a>>: the list may hold the closure while d lives.
+        mut var list = new List<F>();
+        int d = 1;
+        list.Add(() => d);
+        Console.WriteLine(list.Count);
+    }
+
+    static List<F> Escapes()
+    {
+        mut var list = new List<F>();
+        int d = 1;
+        list.Add(() => d); // error: CS9925
+        return list;
+    }
+}

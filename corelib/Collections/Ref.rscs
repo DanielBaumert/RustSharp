@@ -1,0 +1,20 @@
+namespace System
+{
+    /// <summary>Rust's Result: a value or an error.</summary>
+    /// <summary>
+    /// Rust's &amp;T as a value. It can be a type argument, as in Result&lt;Ref&lt;T&gt;, E&gt;, and the borrow checker
+    /// keeps it from outliving what it points to. Like &amp;T it is Copy.
+    /// </summary>
+    [Reference]
+    public readonly unsafe struct Ref<T>
+    {
+        private readonly T* _p;
+        private Ref(T* p) { _p = p; }
+
+        /// <summary>Borrows <paramref name="value"/> for as long as the Ref is used: `&amp;value`.</summary>
+        public static Ref<T> Of(in T value) => new Ref<T>(Mem.AddressOf(in value));
+
+        public ref readonly T Value => ref *_p;
+        public override string ToString() => Value.ToString();
+    }
+}

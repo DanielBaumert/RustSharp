@@ -1,0 +1,79 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+class P
+{
+    static async Task<long> Work(int id, int rounds)
+    {
+        mut long sum = 0;
+        for (mut int i = 0; i < rounds; i++)
+        {
+            await Task.Yield();
+            sum += i * id;
+        }
+        return sum;
+    }
+    static async Task Main()
+    {
+        // Spawned tasks run on the runtime's workers.
+        mut var handles = new List<JoinHandle<long>>();
+        for (mut int i = 1; i <= 8; i++)
+        {
+            int id = i;
+            handles.Add(Task.Run(move () => Work(id, 100)));
+        }
+        mut long total = 0;
+        while (handles.Count > 0) total += (await handles.RemoveAt(0)).Unwrap();
+        Console.WriteLine(total);
+
+        // A shared counter across tasks.
+        var counter = new Arc<AtomicInt>(new AtomicInt(0));
+        mut var tasks = new List<JoinHandle<int>>();
+        for (mut int i = 0; i < 20; i++)
+        {
+            var c = counter.Clone();
+            tasks.Add(Task.Run(move () => Bump(c)));
+        }
+        while (tasks.Count > 0) await tasks.RemoveAt(0);
+        Console.WriteLine(counter.Value.Value);
+
+        // Sleeping tasks overlap instead of adding up.
+        long start = Clock();
+        var a = Task.Run(move () => Sleep(60));
+        var b = Task.Run(move () => Sleep(60));
+        var d = Task.Run(move () => Sleep(60));
+        await a;
+        await b;
+        await d;
+        Console.WriteLine(Clock() - start < 150);
+
+        // A panic ends the task; whoever awaits its handle gets Err, as with tokio's JoinError.
+        var failing = Task.Run(move () => Fail());
+        Console.WriteLine((await failing).UnwrapErr().Message);
+    }
+    static async Task<int> Bump(Arc<AtomicInt> c)
+    {
+        await Task.Delay(1);
+        c.Value.Increment();
+        return 0;
+    }
+    static async Task<int> Sleep(int ms)
+    {
+        await Task.Delay(ms);
+        return ms;
+    }
+    static async Task<int> Fail()
+    {
+        await Task.Yield();
+        Panic.Raise("worker failed");
+        return 0;
+    }
+    static unsafe long Clock()
+    {
+        long* ts = stackalloc long[2];
+        clock_gettime(1, ts);
+        return ts[0] * 1000 + ts[1] / 1000000;
+    }
+    [System.Runtime.InteropServices.DllImport("c")] static extern unsafe int clock_gettime(int clock, long* ts);
+}

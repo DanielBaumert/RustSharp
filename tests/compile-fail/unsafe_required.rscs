@@ -1,0 +1,20 @@
+using System;
+class C { public int V; }
+class P
+{
+    static C S = new C();
+    static int Count;
+    static void Main()
+    {
+        ref int a = ref S.V; // error: CS9921
+        S = new C(); // error: CS9921
+        a = 1;
+        Count = Count + 1; // error: CS9921
+        long bits = Mem.Transmute<C, long>(new C()); // error: CS9921
+        unsafe
+        {
+            ref int b = ref S.V;
+            long ok = Mem.Transmute<int, long>(1);
+        }
+    }
+}

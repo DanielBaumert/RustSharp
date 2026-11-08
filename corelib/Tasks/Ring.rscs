@@ -1,0 +1,34 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    internal unsafe struct Ring
+    {
+        public TaskRecord** Items;
+        public int Head, Count, Capacity;
+
+        public void Add(TaskRecord* r)
+        {
+            if (Count == Capacity)
+            {
+                int bigger = Capacity == 0 ? 16 : Capacity * 2;
+                var items = (TaskRecord**)Libc.malloc((long)bigger * 8);
+                for (int i = 0; i < Count; i++) items[i] = Items[(Head + i) % Capacity];
+                Libc.free(Items);
+                Items = items;
+                Head = 0;
+                Capacity = bigger;
+            }
+            Items[(Head + Count) % Capacity] = r;
+            Count++;
+        }
+
+        public TaskRecord* Take()
+        {
+            TaskRecord* r = Items[Head];
+            Head = (Head + 1) % Capacity;
+            Count--;
+            return r;
+        }
+    }
+}

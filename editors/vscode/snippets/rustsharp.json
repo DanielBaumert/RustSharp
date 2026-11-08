@@ -1,0 +1,163 @@
+{
+  "Main returning Result": {
+    "prefix": "mainr",
+    "body": [
+      "using System;",
+      "",
+      "class Program",
+      "{",
+      "    static Result<Unit, ${1:ParseError}> Main()",
+      "    {",
+      "        $0",
+      "        return Result<Unit, ${1:ParseError}>.Ok(default);",
+      "    }",
+      "}"
+    ],
+    "description": "A program whose Main returns a Result: Err prints the error and exits with 1."
+  },
+  "async Main": {
+    "prefix": "maina",
+    "body": [
+      "using System;",
+      "using System.Threading.Tasks;",
+      "",
+      "class Program",
+      "{",
+      "    static async Task Main()",
+      "    {",
+      "        $0",
+      "    }",
+      "}"
+    ],
+    "description": "An async Main driven by the built-in runtime."
+  },
+  "mut local": {
+    "prefix": "mut",
+    "body": [
+      "mut var ${1:name} = ${2:value};"
+    ],
+    "description": "A variable that may change."
+  },
+  "Result function": {
+    "prefix": "fnr",
+    "body": [
+      "static Result<${1:int}, ${2:string}> ${3:Name}(${4})",
+      "{",
+      "    $0",
+      "    return Result<${1:int}, ${2:string}>.Ok(${5:default});",
+      "}"
+    ],
+    "description": "A method that can fail."
+  },
+  "Ok": {
+    "prefix": "ok",
+    "body": [
+      "Result<${1:T}, ${2:E}>.Ok(${3})"
+    ]
+  },
+  "Err": {
+    "prefix": "err",
+    "body": [
+      "Result<${1:T}, ${2:E}>.Err(${3})"
+    ]
+  },
+  "panic": {
+    "prefix": "panic",
+    "body": [
+      "Panic.Raise(\"${1:message}\");"
+    ],
+    "description": "Rust's panic!"
+  },
+  "move lambda": {
+    "prefix": "movel",
+    "body": [
+      "move () => ${0}"
+    ]
+  },
+  "spawn": {
+    "prefix": "spawn",
+    "body": [
+      "var ${1:handle} = Task.Run(move () => ${2:Work}());"
+    ],
+    "description": "tokio::spawn"
+  },
+  "thread": {
+    "prefix": "thread",
+    "body": [
+      "var ${1:worker} = Thread.Run(move () =>",
+      "{",
+      "    $0",
+      "    return 0;",
+      "});"
+    ],
+    "description": "thread::spawn"
+  },
+  "destructor": {
+    "prefix": "drop",
+    "body": [
+      "~${1:Type}()",
+      "{",
+      "    $0",
+      "}"
+    ],
+    "description": "impl Drop"
+  },
+  "enum with data": {
+    "prefix": "enumd",
+    "body": [
+      "enum ${1:Shape}",
+      "{",
+      "    ${2:Circle}(${3:double R}),",
+      "    ${4:Empty};",
+      "",
+      "    public readonly ${5:int} ${6:Describe}() => this switch",
+      "    {",
+      "        $2(var ${7:r}) => ${8:0},",
+      "        $4 => ${9:0},",
+      "    };",
+      "}"
+    ],
+    "description": "Rust's enum with data; a switch must cover every variant."
+  },
+  "trait": {
+    "prefix": "trait",
+    "body": [
+      "interface ${1:IShow}",
+      "{",
+      "    readonly ${2:string} ${3:Show}();",
+      "    readonly string ${4:Describe}() => \"<\" + $3() + \">\";",
+      "}"
+    ],
+    "description": "A trait: readonly is &self, a body is a default method."
+  },
+  "match": {
+    "prefix": "match",
+    "body": [
+      "${1:value} switch",
+      "{",
+      "    ${2:Pattern} => ${3:result},",
+      "    _ => ${4:other},",
+      "}"
+    ],
+    "description": "Rust's match: a switch expression."
+  },
+  "str": {
+    "prefix": "str",
+    "body": [
+      "str ${1:s} = ${2:text}${3:[..]};"
+    ],
+    "description": "A borrowed &str, no copy."
+  },
+  "enum with a trait": {
+    "prefix": "enumt",
+    "body": [
+      "enum ${1:Abx} : ${2:ITrait}",
+      "{",
+      "    ${3:A}, ${4:B};",
+      "",
+      "    public readonly ${5:int} ${6:Value}() => this switch { $1.$3 => ${7:1}, $1.$4 => ${8:2} };",
+      "}"
+    ],
+    "description": "Rust's impl Trait for Enum."
+  }
+}

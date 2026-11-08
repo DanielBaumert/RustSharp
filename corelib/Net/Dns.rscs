@@ -1,0 +1,36 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    public static class Dns
+    {
+        [DllImport("c")] private static extern unsafe int getaddrinfo(byte* node, byte* service, void* hints, void** result);
+        [DllImport("c")] private static extern unsafe void freeaddrinfo(void* list);
+
+        private static unsafe Result<string, IoError> Lookup(string host)
+        {
+            int n;
+            byte* text = host.ToUtf8(out n);
+            text[n] = 0;
+            void* list;
+            int status = getaddrinfo(text, null, null, &list);
+            Libc.free(text);
+            if (status != 0) return Result<string, IoError>.Err(new IoError("cannot resolve " + host));
+            var addr = *(Sockaddr**)((byte*)list + 24);
+            Sockaddr copy = default;
+            int length = *(int*)((byte*)list + 16);
+            Libc.memcpy(&copy, addr, length);
+            string result = Address.Host(&copy);
+            freeaddrinfo(list);
+            return Result<string, IoError>.Ok(result);
+        }
+
+        /// <summary>Resolves a name to an address. The lookup blocks, so it runs on its own thread.</summary>
+        public static async Task<Result<string, IoError>> ResolveAsync(string host)
+            => System.IO.File.Flatten(await Task.RunBlocking(move () => Lookup(host)));
+    }
+}

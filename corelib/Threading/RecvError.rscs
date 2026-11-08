@@ -1,0 +1,11 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    /// <summary>Sequentially consistent atomics. The members are compiler intrinsics.</summary>
+    /// <summary>The error of Receive: the channel is closed.</summary>
+    public sealed class RecvError
+    {
+        public override readonly string ToString() => "receiving on a closed channel";
+    }
+}

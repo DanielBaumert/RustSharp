@@ -1,0 +1,19 @@
+using System.Collections.Generic;
+using System.Threading;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>Wakes one waiting task: tokio::sync::Notify. Clones share the state.</summary>
+    [SendWhen(Bound.Always), SyncWhen(Bound.Always)]
+    public unsafe struct Notify : IClone<Notify>
+    {
+        private WaitState* _s;
+        public Notify() { _s = WaitState.Create(0); }
+        private Notify(WaitState* s) { _s = s; }
+        public readonly Notify Clone() => new Notify(WaitState.Retain(_s));
+        private static int Make(WaitState* s) => 0;
+        public readonly void NotifyOne() { WaitState.Give(_s); }
+        public readonly Task<int> NotifiedAsync() => new AcquireTask<int>(_s, &Make);
+        ~Notify() { if (_s != null) WaitState.Release(_s); }
+    }
+}

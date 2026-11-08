@@ -1,0 +1,4 @@
+namespace System
+{
+    internal sealed class PanicException : Exception { public PanicException(string m) : base(m) { } }
+}

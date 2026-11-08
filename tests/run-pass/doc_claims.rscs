@@ -1,0 +1,49 @@
+using System;
+class Part { string _n; public Part(string n) { _n = n; } ~Part() { Console.WriteLine("field " + _n); } }
+class Base { Part _b = new Part("base"); ~Base() { Console.WriteLine("~Base"); } }
+struct Guard { int _id; public Guard(int id) { _id = id; } ~Guard() { Console.WriteLine("guard " + _id.ToString()); } }
+ref struct View { ref int _p; public View(ref int p) { _p = ref p; } public readonly int Read() => _p; }
+class A { public int V = 1; ~A() { Console.WriteLine("drop A"); } }
+interface IA { }
+class B : IA { }
+class C2 : IA { }
+delegate int F();
+class Cell { public int V; public Cell(int v) { V = v; } }
+class P
+{
+    static A? Stored = None;
+    static 'a View Make(ref 'a int x, ref int y) { return new View(ref x); }
+    static int ReadView('a View v) => v.Read();
+    static F Reader(Rc<Cell> r) => move () => r.Value.V;
+    static void Main()
+    {
+        { var d = new Base(); }
+
+        Guard empty = default;
+        var real = new Guard(1);
+        Mem.Drop(real);
+        Console.WriteLine("after guard");
+
+        mut int x = 7, y = 8;
+        var v = Make(ref x, ref y);
+        y = 9;
+        Console.WriteLine(ReadView(v));
+
+        IA a = new B();
+        Console.WriteLine(!(a is C2));
+
+        var shared = new Rc<Cell>(new Cell(5));
+        F one = Reader(shared.Clone());
+        F two = Reader(shared.Clone());
+        Console.WriteLine(one() + two());
+        Console.WriteLine(shared.Count);
+
+        unsafe
+        {
+            Stored = Some(new A());
+            var moved = Stored.Take();
+            Console.WriteLine(Stored.IsNone);
+        }
+        Console.WriteLine("end");
+    }
+}

@@ -1,0 +1,14 @@
+namespace System.Runtime.InteropServices
+{
+    public sealed class DllImportAttribute : Attribute
+    {
+        public DllImportAttribute(string dllName) { }
+        public string EntryPoint = "";
+    }
+
+    public enum UnmanagedType { Bool = 2 }
+
+    public sealed class InAttribute : Attribute { }
+
+    public sealed class OutAttribute : Attribute { }
+}

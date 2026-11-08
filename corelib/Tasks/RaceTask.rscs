@@ -1,0 +1,23 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    internal sealed class RaceTask<T> : Task<(int, T)>
+    {
+        private Task<T>[] _tasks;
+        public RaceTask(Task<T>[] tasks) { _tasks = tasks; }
+        internal override bool PollCore()
+        {
+            for (int i = 0; i < _tasks.Length; i++)
+            {
+                if (_tasks[i].Poll())
+                {
+                    _result = Some((i, _tasks[i].TakeResult()));
+                    _tasks = new Task<T>[0];
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+}

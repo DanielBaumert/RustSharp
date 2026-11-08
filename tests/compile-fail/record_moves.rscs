@@ -1,0 +1,11 @@
+class NoClone { public int V; }
+record R(int X, NoClone Y);
+class P
+{
+    static void Main()
+    {
+        var r = new R(1, new NoClone());
+        var y = r.Y;
+        var again = r.Y; // error: CS9900
+    }
+}

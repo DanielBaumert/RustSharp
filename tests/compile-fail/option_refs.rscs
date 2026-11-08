@@ -1,0 +1,37 @@
+using System;
+using System.Collections.Generic;
+// Option<Ref<T>> follows the borrow rules of Rust's Option<&T>.
+class Item { public int V; }
+class P
+{
+    static Option<Ref<int>> Dangling()
+    {
+        int local = 1;
+        return Some(Ref<int>.Of(in local)); // error: CS9914
+    }
+
+    static void Main()
+    {
+        mut int? count = Some(1);
+        var seen = count.AsRef();
+        count = Some(2); // error: CS9907
+        Console.WriteLine(seen.Unwrap().Value);
+
+        mut Option<Ref<int>> outlives = None;
+        {
+            int inner = 3;
+            outlives = Some(Ref<int>.Of(in inner)); // error: CS9914
+        }
+        Console.WriteLine(outlives.IsSome);
+
+        Item? item = Some(new Item());
+        if (item is Some(var it)) Console.WriteLine(it.V);
+        Console.WriteLine(item.IsSome); // error: CS9901
+
+        mut var list = new List<int>();
+        list.Add(1);
+        var first = list.Get(0);
+        list.Add(2); // error: CS9909
+        Console.WriteLine(first.Unwrap().Value);
+    }
+}

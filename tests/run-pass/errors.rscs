@@ -1,0 +1,60 @@
+using System;
+using System.Collections.Generic;
+class Res
+{
+    string _n;
+    public Res(string n) { _n = n; }
+    ~Res() { Console.WriteLine("drop " + _n); }
+}
+class DeepError
+{
+    public int Code;
+    public DeepError(int code) { Code = code; }
+    public override readonly string ToString() => "deep " + Code.ToString();
+}
+class AppError
+{
+    public string Text;
+    public AppError(string t) { Text = t; }
+    // Rust's From: `?` converts a DeepError into an AppError on the way out.
+    public static implicit operator AppError(DeepError e) => new AppError("app: " + e.ToString());
+    public override readonly string ToString() => Text;
+}
+class P
+{
+    static Result<int, DeepError> Fail(int depth)
+    {
+        var r = new Res("frame" + depth.ToString());
+        if (depth == 0) return Result<int, DeepError>.Err(new DeepError(42));
+        return Result<int, DeepError>.Ok(Fail(depth - 1)? + 1);
+    }
+    static Result<int, AppError> Outer() => Result<int, AppError>.Ok(Fail(1)? * 10);
+    static Result<int, ParseError> Sum(List<string> items)
+    {
+        mut int total = 0;
+        foreach (var s in items) total += int.Parse(s)?;
+        return Result<int, ParseError>.Ok(total);
+    }
+    // Rust: s.chars().next()
+    static Option<Rune> FirstLetter(in string s) => s.Chars().First();
+    static Option<string> Initials(string a, string b) => Option<string>.Some(FirstLetter(in a)?.ToString() + FirstLetter(in b)?.ToString());
+    static void Main()
+    {
+        var r = Fail(2);
+        Console.WriteLine(r.IsErr);
+        Console.WriteLine(r.UnwrapErr());
+        Console.WriteLine(Outer());
+        mut var good = new List<string>();
+        good.Add("1");
+        good.Add("22");
+        Console.WriteLine(Sum(good));
+        mut var bad = new List<string>();
+        bad.Add("3");
+        bad.Add("x");
+        Console.WriteLine(Sum(bad).IsErr);
+        Console.WriteLine(Initials("Ada", "Lovelace").Unwrap());
+        Console.WriteLine(Initials("", "Lovelace").IsNone);
+        int fallback = int.Parse("nope").UnwrapOr(7);
+        Console.WriteLine(fallback);
+    }
+}

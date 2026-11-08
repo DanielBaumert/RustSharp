@@ -1,0 +1,198 @@
+using System;
+using System.Collections.Generic;
+
+// Rust's Option<Box<Node>>: `Node?` is a short way to write Option<Node>.
+class Node
+{
+    public int Value;
+    public Node? Next;
+    public Node(int v) { Value = v; Next = None; }
+}
+
+class Stack
+{
+    Node? _head = None;
+    int _size;
+    public readonly int Size => _size;
+    public void Push(int v)
+    {
+        mut var n = new Node(v);
+        n.Next = _head.Take();
+        _head = Some(n);
+        _size++;
+    }
+    public int Pop()
+    {
+        mut var n = _head.Take().Expect("pop from an empty stack");
+        _head = n.Next.Take();
+        _size--;
+        return n.Value;
+    }
+    public void Reverse()
+    {
+        mut Node? prev = None;
+        mut var cur = _head.Take();
+        while (cur.Take() is Some(var node))
+        {
+            mut var n = node;
+            cur = n.Next.Take();
+            n.Next = prev;
+            prev = Some(n);
+        }
+        _head = prev;
+    }
+    public readonly int Sum()
+    {
+        mut int s = 0;
+        mut var cur = _head.AsRef();
+        while (cur is Some(var node)) { s += node.Value.Value; cur = node.Value.Next.AsRef(); }
+        return s;
+    }
+}
+
+class TreeNode
+{
+    public int Key;
+    public string Label;
+    public TreeNode? Left = None, Right = None;
+    public TreeNode(int k, string l) { Key = k; Label = l; }
+}
+
+class Tree
+{
+    TreeNode? _root = None;
+
+    static void Insert(ref TreeNode? slot, int key, string label)
+    {
+        if (slot.AsMut() is Some(var node))
+        {
+            if (key == node.Value.Key) node.Value.Label = label;
+            else if (key < node.Value.Key) Insert(ref node.Value.Left, key, label);
+            else Insert(ref node.Value.Right, key, label);
+        }
+        else slot = Some(new TreeNode(key, label));
+    }
+    public void Insert(int key, string label) => Insert(ref _root, key, label);
+
+    public readonly string? Find(int key)
+    {
+        mut var cur = _root.AsRef();
+        while (cur is Some(var node))
+        {
+            if (key == node.Value.Key) return Some(node.Value.Label.Clone());
+            cur = key < node.Value.Key ? node.Value.Left.AsRef() : node.Value.Right.AsRef();
+        }
+        return None;
+    }
+
+    static int Height(in TreeNode? n) => n.AsRef() switch
+    {
+        Some(var node) => 1 + Math.Max(Height(in node.Value.Left), Height(in node.Value.Right)),
+        None => 0,
+    };
+    public readonly int Height() => Height(in _root);
+}
+
+struct Vec2
+{
+    public double X, Y;
+    public Vec2(double x, double y) { X = x; Y = y; }
+    public static Vec2 operator +(Vec2 a, Vec2 b) => new Vec2(a.X + b.X, a.Y + b.Y);
+    public static Vec2 operator *(Vec2 a, double k) => new Vec2(a.X * k, a.Y * k);
+    public static bool operator ==(Vec2 a, Vec2 b) => a.X == b.X && a.Y == b.Y;
+    public static bool operator !=(Vec2 a, Vec2 b) => !(a == b);
+    public override readonly string ToString() => "(" + X.ToString() + ", " + Y.ToString() + ")";
+}
+
+class Matrix
+{
+    double[] _d;
+    int _n;
+    public Matrix(int n) { _n = n; _d = new double[n * n]; }
+    public ref double this[int r, bool unused] => ref _d[r];
+    public double this[int r, int c]
+    {
+        readonly get => _d[r * _n + c];
+        set => _d[r * _n + c] = value;
+    }
+}
+
+class Logger : IDisposable
+{
+    string _name;
+    public Logger(string name) { Console.WriteLine("open " + name); _name = name; }
+    public void Dispose() { Console.WriteLine("dispose " + _name); }
+    ~Logger() { Console.WriteLine("free " + _name); }
+}
+
+class Base
+{
+    protected int _x;
+    public Base(int x) { _x = x; Console.WriteLine("Base " + x.ToString()); }
+    public Base() : this(1) { Console.WriteLine("Base()"); }
+    public readonly int Get() => _x;
+}
+
+class P
+{
+    const int Limit = 3;
+    static int SumAll(params int[] xs) { mut int s = 0; foreach (var x in xs) s += x; return s; }
+    static int Scaled(int v, int factor = 2, int offset = 1) => v * factor + offset;
+
+    static void Main()
+    {
+        mut var s = new Stack();
+        for (mut int i = 1; i <= 5; i++) s.Push(i);
+        Console.WriteLine(s.Sum());
+        s.Reverse();
+        Console.WriteLine(s.Pop());
+        Console.WriteLine(s.Size);
+
+        mut var t = new Tree();
+        int[] keys = { 50, 30, 70, 20, 40, 60, 80, 30 };
+        foreach (var k in keys) t.Insert(k, "n" + k.ToString());
+        Console.WriteLine(t.Find(60).Unwrap());
+        Console.WriteLine(t.Find(55).IsNone);
+        Console.WriteLine(t.Height());
+
+        var v = new Vec2(1, 2) + new Vec2(3, 4) * 2;
+        Console.WriteLine(v);
+        Console.WriteLine(v == new Vec2(7, 10));
+
+        mut var m = new Matrix(2);
+        m[1, 1] = 9.5;
+        Console.WriteLine(m[1, 1]);
+
+        using (var l = new Logger("a"))
+        {
+            Console.WriteLine("in using");
+        }
+        using var l2 = new Logger("b");
+
+        var b2 = new Base();
+        Console.WriteLine(b2.Get());
+
+        Console.WriteLine(SumAll(1, 2, 3));
+        Console.WriteLine(SumAll());
+        Console.WriteLine(Scaled(5));
+        Console.WriteLine(Scaled(5, offset: 0));
+        Console.WriteLine(Limit * 2);
+
+        mut var dict = new Dictionary<string, string>();
+        for (mut int i = 0; i < 100; i++) dict.Set("k" + i.ToString(), "v" + (i * 2).ToString());
+        dict.Set("k7", "seven");
+        Console.WriteLine(dict.Count);
+        Console.WriteLine(dict.Get("k7").Unwrap().Value);
+        Console.WriteLine(dict.Get("k99").Unwrap().Value);
+        Console.WriteLine(dict.ContainsKey("nope"));
+
+        Console.WriteLine("a" + 1 + 'c' + 2.5 + true);
+        mut char c = 'a';
+        c++;
+        Console.WriteLine((char)(c + 1));
+        mut long big = int.MaxValue;
+        big = big * 2 + 1;
+        Console.WriteLine(big);
+        Console.WriteLine(1 > 0 ? "yes" : "no");
+    }
+}

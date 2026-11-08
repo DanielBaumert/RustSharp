@@ -1,0 +1,168 @@
+namespace System
+{
+    /// <summary>Rust's Option: a value or nothing, without null.</summary>
+    [CarriesBorrows]
+    public struct Option<T>
+    {
+        private bool _some;
+        private T _value;
+        private Option(T value) { _some = true; _value = value; }
+
+        public static Option<T> Some(T value) => new Option<T>(value);
+        public static Option<T> None => default(Option<T>);
+
+        public readonly bool IsSome => _some;
+        public readonly bool IsNone => !_some;
+
+        public move T Unwrap()
+        {
+            if (!_some) Panic.Raise("called `Option::unwrap()` on a `None` value");
+            return _value;
+        }
+
+        /// <summary>Rust's expect: Unwrap with a message of your own.</summary>
+        public move T Expect(string message)
+        {
+            if (!_some) Panic.Raise(message);
+            return _value;
+        }
+
+        // ---- checks. Like Rust they consume the Option; AsRef first keeps it.
+
+        public move bool IsSomeAnd(Func<T, bool> f) => _some && f(_value);
+        public move bool IsNoneOr(Func<T, bool> f) => !_some || f(_value);
+
+        // ---- references: as_ref and as_mut
+
+        public readonly Option<Ref<T>> AsRef() => _some ? Option<Ref<T>>.Some(Ref<T>.Of(in _value)) : Option<Ref<T>>.None;
+        public Option<RefMut<T>> AsMut() => _some ? Option<RefMut<T>>.Some(RefMut<T>.Of(ref _value)) : Option<RefMut<T>>.None;
+        internal readonly unsafe ref readonly T Slot => ref *Mem.AddressOf(in _value);
+
+        /// <summary>Rust's MaybeUninit for a None: where a coroutine writes the value. AssumeSome then makes it Some.</summary>
+        internal unsafe T* UninitSlot() { if (_some) Panic.Unreachable(); return Mem.AddressOf(in _value); }
+        internal void AssumeSome() { _some = true; }
+        internal unsafe ref T SlotMut => ref *Mem.AddressOf(in _value);
+
+        // ---- fallbacks
+
+        public move T UnwrapOr(T fallback) => _some ? _value : fallback;
+        public move T UnwrapOrElse(Func<T> f) => _some ? _value : f();
+
+        // UnwrapOrDefault needs `T : IDefault<T>` like Rust's `T: Default`: see OptionExtensions.
+
+        // ---- transforming
+
+        public move Option<U> Map<U>(Func<T, U> f) => _some ? Option<U>.Some(f(_value)) : Option<U>.None;
+        public move U MapOr<U>(U fallback, Func<T, U> f) => _some ? f(_value) : fallback;
+        public move U MapOrElse<U>(Func<U> fallback, Func<T, U> f) => _some ? f(_value) : fallback();
+
+        /// <summary>Looks at the value without changing it, then passes the Option on.</summary>
+        public move Option<T> Inspect(System.Linq.Visitor<T> f)
+        {
+            if (!_some) return Option<T>.None;
+            f(in _value);
+            return Option<T>.Some(_value);
+        }
+
+        /// <summary>Rust's ok_or: Some(v) becomes Ok(v), None becomes Err(error).</summary>
+        public move Result<T, E> OkOr<E>(E error) => _some ? Result<T, E>.Ok(_value) : Result<T, E>.Err(error);
+        public move Result<T, E> OkOrElse<E>(Func<E> f) => _some ? Result<T, E>.Ok(_value) : Result<T, E>.Err(f());
+
+        /// <summary>Keeps the value only when the predicate holds for it.</summary>
+        public move Option<T> Filter(System.Linq.Predicate<T> keep)
+        {
+            if (_some && keep(in _value)) return Option<T>.Some(_value);
+            return Option<T>.None;
+        }
+
+        // ---- chaining
+
+        public move Option<U> And<U>(Option<U> other) => _some ? other : Option<U>.None;
+        public move Option<U> AndThen<U>(Func<T, Option<U>> f) => _some ? f(_value) : Option<U>.None;
+        public move Option<T> Or(Option<T> other) => _some ? Option<T>.Some(_value) : other;
+        public move Option<T> OrElse(Func<Option<T>> f) => _some ? Option<T>.Some(_value) : f();
+
+        /// <summary>Some if exactly one of the two is Some.</summary>
+        public move Option<T> Xor(Option<T> other)
+        {
+            if (_some && other.IsNone) return Option<T>.Some(_value);
+            if (!_some && other.IsSome) return other;
+            return Option<T>.None;
+        }
+
+        /// <summary>Some((a, b)) when both are Some.</summary>
+        public move Option<(T, U)> Zip<U>(Option<U> other)
+        {
+            if (!_some || other.IsNone) return Option<(T, U)>.None;
+            return Option<(T, U)>.Some((_value, other.Unwrap()));
+        }
+
+        // ---- changing in place
+
+        /// <summary>Moves the value out and leaves None behind.</summary>
+        public Option<T> Take() => Mem.Replace(ref this, None);
+
+        /// <summary>Takes the value only when the predicate holds for it.</summary>
+        public Option<T> TakeIf(System.Linq.Predicate<T> test)
+        {
+            if (_some && test(in _value)) return Take();
+            return Option<T>.None;
+        }
+
+        /// <summary>Puts a value in and returns the old one.</summary>
+        public Option<T> Replace(T value)
+        {
+            var old = Take();
+            _some = true;
+            _value = value;
+            return old;
+        }
+
+        /// <summary>Puts a value in, dropping the old one, and lends it out.</summary>
+        public unsafe ref T Insert(T value)
+        {
+            Replace(value);
+            return ref *Mem.AddressOf(in _value);
+        }
+
+        public unsafe ref T GetOrInsert(T value)
+        {
+            if (!_some)
+            {
+                _some = true;
+                _value = value;
+            }
+            return ref *Mem.AddressOf(in _value);
+        }
+
+        public unsafe ref T GetOrInsertWith(Func<T> f)
+        {
+            if (!_some)
+            {
+                _some = true;
+                _value = f();
+            }
+            return ref *Mem.AddressOf(in _value);
+        }
+
+        // ---- iteration
+
+        public unsafe readonly System.Linq.Query<T, System.Linq.SliceIter<T>> Iter()
+            => new System.Linq.Query<T, System.Linq.SliceIter<T>>(new System.Linq.SliceIter<T>(_some ? Mem.AddressOf(in _value) : null, _some ? 1 : 0));
+        public unsafe OnceMut<T> IterMut() => new OnceMut<T>(_some ? Mem.AddressOf(in _value) : null);
+
+        // ---- matching: `o is Some(var v)` tests IsSome first, then calls Deconstruct.
+
+        /// <summary>The value of `Some(var v)`. Called on None it panics like Unwrap.</summary>
+        public move void Deconstruct(out T value)
+        {
+            if (!_some) Panic.Raise("called `Option::unwrap()` on a `None` value");
+            value = _value;
+        }
+
+        /// <summary>The prelude's `None` becomes a None of any T.</summary>
+        public static implicit operator Option<T>(NoneValue none) => default(Option<T>);
+
+        public override readonly string ToString() => _some ? "Some(" + _value.ToString() + ")" : "None";
+    }
+}

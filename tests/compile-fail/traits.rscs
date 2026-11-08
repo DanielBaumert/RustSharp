@@ -1,0 +1,27 @@
+using System;
+interface IShow { readonly string Show(); }
+interface IGrow { void Grow(); }
+interface IFinish { move int Finish(); }
+class Bad : IShow { public string Show() => "x"; } // error: CS9920
+class Fine : IShow, IGrow, IFinish
+{
+    public int N;
+    public readonly string Show() => N.ToString();
+    public void Grow() { N++; }
+    public move int Finish() => N;
+}
+class P
+{
+    static void Use(in Fine f)
+    {
+        Console.WriteLine(f.Show());
+        f.Grow(); // error: CS9918
+    }
+    static void Main()
+    {
+        mut var f = new Fine();
+        f.Grow();
+        Console.WriteLine(f.Finish());
+        Console.WriteLine(f.Show()); // error: CS9901
+    }
+}

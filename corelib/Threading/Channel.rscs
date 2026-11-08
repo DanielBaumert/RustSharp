@@ -1,0 +1,22 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    /// <summary>An unbounded multi-producer, single-consumer queue: Rust's mpsc.</summary>
+    public static unsafe class Channel
+    {
+        public static (Sender<T>, Receiver<T>) Create<T>()
+        {
+            var state = Sender<T>.NewState();
+            return (new Sender<T>(state), new Receiver<T>(state));
+        }
+
+        /// <summary>A channel with limited room: SendAsync waits when it is full, which gives backpressure.</summary>
+        public static (Sender<T>, Receiver<T>) CreateBounded<T>(int capacity)
+        {
+            var state = Sender<T>.NewState();
+            Mem.AsRef(state).Capacity = capacity;
+            return (new Sender<T>(state), new Receiver<T>(state));
+        }
+    }
+}

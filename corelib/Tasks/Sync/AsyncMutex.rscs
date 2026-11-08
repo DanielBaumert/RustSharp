@@ -1,0 +1,25 @@
+using System.Collections.Generic;
+using System.Threading;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>A mutex whose guard may be held across `await`: tokio::sync::Mutex. Clones share the data.</summary>
+    [SendWhen(Bound.Send), SyncWhen(Bound.Send)]
+    public unsafe struct AsyncMutex<T> : IClone<AsyncMutex<T>>
+    {
+        private WaitState* _s;
+        private Arc<Mutex<T>> _value;
+
+        public AsyncMutex(T value)
+        {
+            _s = WaitState.Create(1);
+            _value = new Arc<Mutex<T>>(new Mutex<T>(value));
+        }
+
+        private AsyncMutex(WaitState* s, Arc<Mutex<T>> value) { _s = s; _value = value; }
+        public readonly AsyncMutex<T> Clone() => new AsyncMutex<T>(WaitState.Retain(_s), _value.Clone());
+        ~AsyncMutex() { if (_s != null) WaitState.Release(_s); }
+
+        public readonly Task<AsyncGuard<T>> LockAsync() => new LockTask<T>(_s, _value.Clone());
+    }
+}

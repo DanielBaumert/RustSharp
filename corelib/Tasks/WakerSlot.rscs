@@ -1,0 +1,15 @@
+namespace System
+{
+    /// <summary>A place that may hold a waiting task's Waker: Rust's Option&lt;Waker&gt;, as tokio keeps it.</summary>
+    internal static class WakerSlot
+    {
+        /// <summary>Wakes the task, if there is one.</summary>
+        public static void Wake(this in Option<System.Threading.Tasks.Waker> waker)
+        {
+            if (waker.IsSome) waker.Slot.Wake();
+        }
+
+        /// <summary>None, or a Waker that wakes nothing.</summary>
+        public static bool IsIdle(this in Option<System.Threading.Tasks.Waker> waker) => waker.IsNone || waker.Slot.IsNoop;
+    }
+}

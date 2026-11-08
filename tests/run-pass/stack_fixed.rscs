@@ -1,0 +1,37 @@
+using System;
+class C { public int V = 3; }
+unsafe class P
+{
+    static int Sum(int n)
+    {
+        int* p = stackalloc int[n];
+        for (mut int i = 0; i < n; i++) p[i] = i + 1;
+        mut int s = 0;
+        for (mut int i = 0; i < n; i++) s += p[i];
+        return s;
+    }
+    static void Main()
+    {
+        Console.WriteLine(Sum(10));
+        int* zeroed = stackalloc int[4];
+        Console.WriteLine(zeroed[3]);
+        int* filled = stackalloc int[] { 4, 5, 6 };
+        Console.WriteLine(filled[2]);
+        mut Span<int> s = stackalloc int[3];
+        s[1] = 8;
+        Console.WriteLine(s[1] + s.Length);
+
+        mut int[] a = new int[3];
+        fixed (int* p = a) { p[1] = 8; }
+        Console.WriteLine(a[1]);
+        mut int[] empty = new int[0];
+        fixed (int* p = empty) { Console.WriteLine(p == null); }
+        string t = "hi";
+        byte* bytes = t.AsPtr(); // Rust's as_ptr(): the UTF-8 bytes
+        Console.WriteLine((char)bytes[1]);
+        Console.WriteLine(t);
+        var c = new C();
+        fixed (int* p = &c.V) { *p = 6; }
+        Console.WriteLine(c.V);
+    }
+}

@@ -1,0 +1,13 @@
+using System;
+// exit: 101
+class C { }
+class D { }
+class P
+{
+    static void Main()
+    {
+        object o = new C();
+        Console.WriteLine(o is D);
+        D d = (D)o;
+    }
+}

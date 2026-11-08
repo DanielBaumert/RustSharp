@@ -1,0 +1,19 @@
+class A { }
+class D { public A X = new A(); ~D() { } }
+class H
+{
+    public A X = new A();
+    public A Steal() => X; // error: CS9902
+    public H Self() => this; // error: CS9902
+    public move A Fine() => X;
+}
+class P
+{
+    static A S = new A();
+    static A FromRef(ref A a) => a; // error: CS9902
+    static A FromIn(in A a) => a; // error: CS9902
+    static A FromArray(A[] a) => a[0]; // error: CS9903
+    static unsafe A FromStatic() => S; // error: CS9904
+    static A FromDrop(D d) => d.X; // error: CS9905
+    static void Main() { }
+}

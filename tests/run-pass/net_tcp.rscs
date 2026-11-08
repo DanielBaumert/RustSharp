@@ -1,0 +1,110 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net.Sockets;
+using System.Threading;
+using System.Threading.Tasks;
+class P
+{
+    static async Task<Result<int, IoError>> Echo(TcpStream s)
+    {
+        mut byte[] buf = new byte[1024];
+        mut int total = 0;
+        while (true)
+        {
+            int n = (await s.ReadAsync(ref buf))?;
+            if (n == 0) return Result<int, IoError>.Ok(total);
+            total += n;
+            (await s.WriteAsync(in buf, n))?;
+        }
+    }
+    static async Task<Result<int, IoError>> Serve(TcpListener l, int connections)
+    {
+        for (mut int i = 0; i < connections; i++)
+        {
+            var conn = (await l.AcceptAsync())?;
+            Task.Run(move () => Echo(conn));
+        }
+        return Result<int, IoError>.Ok(connections);
+    }
+    static async Task<Result<string, IoError>> Client(int port, int id)
+    {
+        mut var c = (await TcpStream.ConnectAsync("127.0.0.1", port))?;
+        (await c.WriteAsync("hello " + id.ToString() + "\n"))?;
+        var line = (await c.ReadLineAsync())?.UnwrapOr("");
+        (await c.WriteAsync("bye\n"))?;
+        var last = (await c.ReadLineAsync())?.UnwrapOr("");
+        c.ShutdownWrite();
+        return Result<string, IoError>.Ok(line + "/" + last);
+    }
+    static async Task<Result<int, IoError>> Http(TcpListener l)
+    {
+        mut var c = (await l.AcceptAsync())?;
+        string first = (await c.ReadLineAsync())?.UnwrapOr("");
+        while (true)
+        {
+            var header = (await c.ReadLineAsync())?;
+            if (header.MapOr(true, h => h.Length == 0)) break;
+        }
+        (await c.WriteAsync("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"))?;
+        return Result<int, IoError>.Ok(first.Length);
+    }
+    static async Task Main()
+    {
+        var listener = TcpListener.Bind("127.0.0.1", 0).Unwrap();
+        int port = listener.LocalPort;
+        Console.WriteLine(port > 0);
+        var server = Task.Run(move () => Serve(listener, 50));
+
+        mut var clients = new List<JoinHandle<Result<string, IoError>>>();
+        for (mut int i = 0; i < 50; i++)
+        {
+            int id = i;
+            clients.Add(Task.Run(move () => Client(port, id)));
+        }
+        mut int good = 0;
+        for (mut int i = 0; clients.Count > 0; i++)
+        {
+            string r = (await clients.RemoveAt(0)).Unwrap().Unwrap();
+            if (r == "hello " + i.ToString() + "/bye") good++;
+        }
+        Console.WriteLine(good);
+        Console.WriteLine((await server).Unwrap().Unwrap());
+
+        var web = TcpListener.Bind("localhost", 0).Unwrap();
+        int webPort = web.LocalPort;
+        var h = Task.Run(move () => Http(web));
+        mut var client = (await TcpStream.ConnectAsync("localhost", webPort)).Unwrap();
+        (await client.WriteAsync("GET / HTTP/1.1\r\nHost: x\r\n\r\n")).Unwrap();
+        Console.WriteLine((await client.ReadLineAsync()).Unwrap().Unwrap());
+        Console.WriteLine((await h).Unwrap().Unwrap());
+
+        // A refused connection is an Err value.
+        var refused = await TcpStream.ConnectAsync("127.0.0.1", 1);
+        Console.WriteLine(refused.IsErr ? "refused" : "connected");
+        Console.WriteLine(TcpListener.Bind("not an address", 0).IsErr);
+
+        // Large transfers need several reads and writes.
+        var big = TcpListener.Bind("127.0.0.1", 0).Unwrap();
+        int bigPort = big.LocalPort;
+        var sink = Task.Run(move () => Sink(big));
+        var sender = (await TcpStream.ConnectAsync("127.0.0.1", bigPort)).Unwrap();
+        mut byte[] data = new byte[4000000];
+        for (mut int i = 0; i < data.Length; i++) data[i] = (byte)(i % 251);
+        (await sender.WriteAsync(in data, data.Length)).Unwrap();
+        sender.ShutdownWrite();
+        Console.WriteLine((await sink).Unwrap().Unwrap());
+    }
+    static async Task<Result<long, IoError>> Sink(TcpListener l)
+    {
+        var c = (await l.AcceptAsync())?;
+        mut byte[] buf = new byte[65536];
+        mut long sum = 0;
+        while (true)
+        {
+            int n = (await c.ReadAsync(ref buf))?;
+            if (n == 0) return Result<long, IoError>.Ok(sum);
+            for (mut int i = 0; i < n; i++) sum += buf[i];
+        }
+    }
+}

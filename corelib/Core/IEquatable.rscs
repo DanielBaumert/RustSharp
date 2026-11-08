@@ -1,0 +1,19 @@
+namespace System
+{
+    public interface IEquatable<T> { bool Equals(T other); }
+
+    /// <summary>Rust's `()`: the Ok value of an operation that returns nothing.</summary>
+    public readonly struct Unit
+    {
+        public override string ToString() => "()";
+    }
+
+    /// <summary>Why a string did not parse.</summary>
+    public sealed class ParseError
+    {
+        private string _message;
+        public ParseError(string message) { _message = message; }
+        public readonly string Message => _message.Clone();
+        public override readonly string ToString() => _message.Clone();
+    }
+}

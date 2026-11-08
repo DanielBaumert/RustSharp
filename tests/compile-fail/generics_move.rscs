@@ -1,0 +1,8 @@
+class P
+{
+    static T Dup<T>(T x) { var a = x; return x; } // error: CS9900
+    static T Fine<T>(T x) where T : unmanaged { var a = x; return x; }
+    static void Pair<T>(T x) { Take(x); Take(x); } // error: CS9900
+    static void Take<T>(T x) { }
+    static void Main() { }
+}

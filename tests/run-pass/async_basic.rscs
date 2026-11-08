@@ -1,0 +1,87 @@
+// exit: 3
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+class R { string _n; public R(string n) { _n = n; } ~R() { Console.WriteLine("drop " + _n); } public readonly string Name => _n; }
+class Calc
+{
+    int _base = 10;
+    public async Task<int> AddAsync(int x)
+    {
+        await Task.Yield();
+        return _base + x;
+    }
+}
+class P
+{
+    static async Task<int> Add(int a, int b)
+    {
+        await Task.Yield();
+        return a + b;
+    }
+    static async Task<string> Chain()
+    {
+        int x = await Add(1, 2);
+        int y = await Add(x, 4);
+        return "sum " + y.ToString();
+    }
+    static async Task Loop()
+    {
+        mut int total = 0;
+        for (mut int i = 0; i < 3; i++)
+        {
+            await Task.Delay(1);
+            total += await Add(i, 1);
+        }
+        Console.WriteLine(total);
+    }
+    static async Task<Result<int, string>> Fails()
+    {
+        await Task.Yield();
+        return Result<int, string>.Err("async failure");
+    }
+    static async Task<Result<int, string>> Passes()
+    {
+        int v = (await Fails())?;
+        Console.WriteLine("never");
+        return Result<int, string>.Ok(v);
+    }
+    static async Task Catches()
+    {
+        var r = await Passes();
+        Console.WriteLine(r.UnwrapErr());
+        Console.WriteLine("finally");
+    }
+    static async Task Holds()
+    {
+        var r = new R("held");
+        await Task.Yield();
+        Console.WriteLine(r.Name);
+    }
+    static async Task Cancelled()
+    {
+        var r = new R("cancelled");
+        await Task.Delay(100000);
+        Console.WriteLine("never");
+    }
+    static async Task<int> Main()
+    {
+        Console.WriteLine("lazy");
+        var pending = Add(2, 3);
+        Console.WriteLine("not started");
+        Console.WriteLine(await pending);
+        Console.WriteLine(await Chain());
+        await Loop();
+        await Catches();
+        await Holds();
+        mut var calc = new Calc();
+        Console.WriteLine(await calc.AddAsync(5));
+        mut var c = Cancelled();
+        c.Poll();
+        Mem.Drop(c);
+        Console.WriteLine("dropped");
+        await Task.WhenAll(Task.Delay(1), Task.Delay(2));
+        Console.WriteLine(await Task.FromResult(7));
+        return 3;
+    }
+}

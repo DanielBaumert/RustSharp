@@ -1,0 +1,17 @@
+using System;
+class Big { public int V = 7; ~Big() { Console.WriteLine("big dropped"); } }
+class P
+{
+    static void Main()
+    {
+        var a = new Rc<Big>(new Big());
+        Console.WriteLine(a.Count);
+        {
+            var b = a.Clone();
+            Console.WriteLine(a.Count);
+            Console.WriteLine(b.Value.V);
+        }
+        Console.WriteLine(a.Count);
+        Console.WriteLine("end");
+    }
+}

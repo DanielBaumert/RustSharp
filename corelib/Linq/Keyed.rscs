@@ -1,0 +1,9 @@
+namespace System.Linq
+{
+    internal struct Keyed<K, T> : IOrd<Keyed<K, T>>
+    {
+        public K Key;
+        public T Item;
+        public readonly int Compare(in Keyed<K, T> other) => Mem.CompareOf(in Key, in other.Key);
+    }
+}

@@ -1,0 +1,18 @@
+using System.Collections.Generic;
+using System.Threading;
+
+namespace System.Threading.Tasks
+{
+    [SendWhen(Bound.Always), SyncWhen(Bound.Always)]
+    public unsafe struct Permit
+    {
+        private WaitState* _s;
+        internal Permit(WaitState* s) { _s = s; }
+        ~Permit()
+        {
+            if (_s == null) return;
+            WaitState.Give(_s);
+            WaitState.Release(_s);
+        }
+    }
+}

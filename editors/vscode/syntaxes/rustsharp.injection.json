@@ -1,0 +1,63 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "scopeName": "rustsharp.injection",
+  "injectionSelector": "L:source.rscs -comment -string",
+  "patterns": [
+    {
+      "include": "#rusttypes"
+    },
+    {
+      "include": "#lifetime"
+    },
+    {
+      "include": "#mut"
+    },
+    {
+      "include": "#move"
+    },
+    {
+      "include": "#propagate"
+    },
+    {
+      "include": "#panic"
+    }
+  ],
+  "repository": {
+    "lifetime": {
+      "comment": "'a and 'static, but not the character literal 'a'.",
+      "match": "'[A-Za-z_][A-Za-z0-9_]*\\b(?!')",
+      "name": "storage.modifier.lifetime.rscs"
+    },
+    "mut": {
+      "comment": "mut before a type or a name: `mut int x`, `mut var x`, `(mut int v) =>`.",
+      "match": "(?<![\\w.@])mut(?=\\s+(?!(?:is|as|in|switch|with|and|or)\\b)[A-Za-z_@(\\[])",
+      "name": "storage.modifier.mut.rscs"
+    },
+    "move": {
+      "comment": "move methods and move lambdas.",
+      "match": "(?<![\\w.@])move(?=\\s*\\(|\\s+[A-Za-z_@])",
+      "name": "storage.modifier.move.rscs"
+    },
+    "propagate": {
+      "comment": "Rust's ? at the end of an expression.",
+      "match": "\\?(?=\\s*[;),\\]}])",
+      "name": "keyword.operator.propagate.rscs"
+    },
+    "panic": {
+      "match": "\\b(Panic)\\s*\\.\\s*(Raise|Unreachable|Todo|Assert)\\b",
+      "captures": {
+        "1": {
+          "name": "entity.name.type.class.cs"
+        },
+        "2": {
+          "name": "entity.name.function.macro.rscs"
+        }
+      }
+    },
+    "rusttypes": {
+      "comment": "str, Rune, Ref, RefMut, Box, Result, Option and Unit read like built-in types.",
+      "match": "\\b(str|Rune|Unit)\\b",
+      "name": "keyword.type.rscs"
+    }
+  }
+}

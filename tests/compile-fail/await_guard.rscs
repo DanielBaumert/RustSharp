@@ -1,0 +1,20 @@
+using System.Threading;
+using System.Threading.Tasks;
+class P
+{
+    static async Task Hold(Mutex<int> m)
+    {
+        mut var g = m.Lock(); // error: CS9926
+        await Task.Yield();
+        g.Value = 1;
+    }
+    static async Task Fine(Mutex<int> m)
+    {
+        {
+            mut var g = m.Lock();
+            g.Value = 1;
+        }
+        await Task.Yield();
+    }
+    static void Main() { }
+}

@@ -1,0 +1,58 @@
+namespace System
+{
+    internal static unsafe class Number
+    {
+        public static string Format(long v)
+        {
+            if (v == Int64.MinValue) return "-9223372036854775808";
+            bool negative = v < 0;
+            return FormatDigits((ulong)(negative ? -v : v), negative);
+        }
+
+        public static string FormatUnsigned(ulong v) => FormatDigits(v, false);
+
+        private static string FormatDigits(ulong v, bool negative)
+        {
+            int n = negative ? 1 : 0;
+            ulong t = v;
+            do { n++; t /= 10; } while (t != 0);
+            string s = String.Allocate(n);
+            int i = n;
+            do { s.SetByte(--i, (byte)('0' + (int)(v % 10))); v /= 10; } while (v != 0);
+            if (negative) s.SetByte(0, (byte)('-'));
+            return s;
+        }
+
+        public static string Format(double d) => Format(d, 15);
+
+        public static string Format(double d, int digits)
+        {
+            byte* buf = (byte*)Libc.malloc(64);
+            Libc.gcvt(d, digits, buf);
+            int n = (int)Libc.strlen(buf);
+            if (n > 0 && buf[n - 1] == (byte)'.') n--;
+            string s = String.FromUtf8(buf, n);
+            Libc.free(buf);
+            return s;
+        }
+
+        public static bool TryParse(string s, out long value)
+        {
+            value = 0;
+            int i = 0;
+            bool negative = false;
+            int length = s.Length;
+            if (length > 0 && s.ByteAt(0) == '-') { negative = true; i = 1; }
+            if (i == length) return false;
+            long v = 0;
+            for (; i < length; i++)
+            {
+                char c = (char)s.ByteAt(i);
+                if (!char.IsDigit(c)) return false;
+                v = v * 10 + (c - '0');
+            }
+            value = negative ? -v : v;
+            return true;
+        }
+    }
+}

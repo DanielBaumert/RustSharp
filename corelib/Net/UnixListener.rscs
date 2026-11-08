@@ -1,0 +1,29 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    public sealed unsafe class UnixListener
+    {
+        [DllImport("c")] private static extern int unlink(byte* path);
+        private Arc<SocketHandle> _socket;
+        private UnixListener(int fd) { _socket = new Arc<SocketHandle>(new SocketHandle(fd)); }
+
+        public static Result<UnixListener, IoError> Bind(string path)
+        {
+            Sockaddr a = default;
+            if (!Address.Unix(path, &a)) return Result<UnixListener, IoError>.Err(new IoError("unix socket path is too long"));
+            int n;
+            byte* text = path.ToUtf8(out n);
+            text[n] = 0;
+            unlink(text);
+            Libc.free(text);
+            return Result<UnixListener, IoError>.Ok(new UnixListener(Listeners.Open(&a)?));
+        }
+
+        public readonly Task<Result<UnixStream, IoError>> AcceptAsync() => new AcceptTask<UnixStream>(_socket.Clone(), &UnixStream.Make);
+    }
+}

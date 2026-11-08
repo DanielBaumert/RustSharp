@@ -1,0 +1,19 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>Work that returns a task, for Task.Run: what it captures must be Send.</summary>
+    [Send, Once] public delegate Task<T> AsyncWork<T>();
+    [Send, Once] public delegate Task AsyncAction();
+
+    /// <summary>An `await`-able that wraps a task; it exists for the shape of IAsyncEnumerator.</summary>
+    [BorrowHolder, AsyncMethodBuilder(typeof(ValueTaskBuilder))]
+    public unsafe struct ValueTask
+    {
+        private Task _task;
+        public ValueTask(Task task) { _task = task; }
+        public static ValueTask FromCoroutine(void* frame, delegate*<void*, void*, int> resume, delegate*<void*, void> drop)
+            => new ValueTask(Task.FromCoroutine(frame, resume, drop));
+        public move TaskAwaiter GetAwaiter() => _task.GetAwaiter();
+    }
+}

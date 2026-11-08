@@ -1,0 +1,58 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    /// <summary>Many readers or one writer across threads: Rust's RwLock.</summary>
+    [SendWhen(Bound.Send), SyncWhen(Bound.Send | Bound.Sync)]
+    public unsafe class RwLock<T>
+    {
+
+        private void* _lock;
+        private T _value;
+
+        public RwLock(T value)
+        {
+            _lock = Libc.malloc(64);
+            Pthread.pthread_rwlock_init(_lock, null);
+            _value = value;
+        }
+
+        ~RwLock()
+        {
+            Pthread.pthread_rwlock_destroy(_lock);
+            Libc.free(_lock);
+        }
+
+        public readonly Reader Read()
+        {
+            Pthread.pthread_rwlock_rdlock(_lock);
+            return new Reader(_lock, Mem.AddressOf(in _value));
+        }
+
+        public readonly Writer Write()
+        {
+            Pthread.pthread_rwlock_wrlock(_lock);
+            return new Writer(_lock, Mem.AddressOf(in _value));
+        }
+
+        [MustNotSuspend]
+        public ref struct Reader
+        {
+            private void* _lock;
+            private T* _value;
+            internal Reader(void* l, T* value) { _lock = l; _value = value; }
+            public readonly ref readonly T Value => ref *_value;
+            ~Reader() { Pthread.pthread_rwlock_unlock(_lock); }
+        }
+
+        [MustNotSuspend]
+        public ref struct Writer
+        {
+            private void* _lock;
+            private T* _value;
+            internal Writer(void* l, T* value) { _lock = l; _value = value; }
+            public ref T Value => ref *_value;
+            ~Writer() { Pthread.pthread_rwlock_unlock(_lock); }
+        }
+    }
+}

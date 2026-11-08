@@ -1,0 +1,19 @@
+using System;
+class P
+{
+    static int Bad(int x, Exception e)
+    {
+        if (x < 0) throw e; // error: CS9930
+        return x;
+    }
+    static int Pick(int x, Exception e) => x > 0 ? x : throw e; // error: CS9930
+    static Result<int, string> Half(int x) => Result<int, string>.Ok(x / 2);
+    static int NotResult(int x) => Half(x)?; // error: CS9932
+    static void Main()
+    {
+        try { Half(1); } // error: CS9930
+        catch (Exception) { }
+        try { Half(2); } // error: CS9930
+        finally { }
+    }
+}

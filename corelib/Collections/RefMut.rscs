@@ -1,0 +1,19 @@
+namespace System
+{
+    /// <summary>Rust's &amp;mut T as a value. Like &amp;mut T it is not Copy: there is only ever one.</summary>
+    [Reference]
+    public unsafe struct RefMut<T>
+    {
+        private T* _p;
+        private RefMut(T* p) { _p = p; }
+
+        /// <summary>Borrows <paramref name="value"/> exclusively: `&amp;mut value`.</summary>
+        public static RefMut<T> Of(ref T value) => new RefMut<T>(Mem.AddressOf(in value));
+
+        public readonly ref T Value => ref *_p;
+        public override readonly string ToString() => Value.ToString();
+
+        // A destructor makes the type move-only, so two RefMut never point at the same value.
+        ~RefMut() { }
+    }
+}

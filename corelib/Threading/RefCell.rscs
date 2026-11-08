@@ -1,0 +1,51 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    /// <summary>Several readers or one writer, checked at run time: Rust's RefCell, for one thread.</summary>
+    [SendWhen(Bound.Send), SyncWhen(Bound.Never)]
+    public unsafe class RefCell<T>
+    {
+        private int _state; // -1 while a writer exists, otherwise the number of readers
+        private T _value;
+        public RefCell(T value) { _value = value; }
+
+        public readonly Reader Borrow()
+        {
+            int* state = Mem.AddressOf(in _state);
+            if (*state < 0) Panic.Raise("already mutably borrowed: BorrowError");
+            *state = *state + 1;
+            return new Reader(state, Mem.AddressOf(in _value));
+        }
+
+        /// <summary>Rust's try_borrow_mut: false instead of the panic of BorrowMut.</summary>
+        public readonly bool CanBorrowMut => _state == 0;
+        public readonly bool CanBorrow => _state >= 0;
+
+        public readonly Writer BorrowMut()
+        {
+            int* state = Mem.AddressOf(in _state);
+            if (*state != 0) Panic.Raise("already borrowed: BorrowMutError");
+            *state = -1;
+            return new Writer(state, Mem.AddressOf(in _value));
+        }
+
+        public ref struct Reader
+        {
+            private int* _state;
+            private T* _value;
+            internal Reader(int* state, T* value) { _state = state; _value = value; }
+            public readonly ref readonly T Value => ref *_value;
+            ~Reader() { *_state = *_state - 1; }
+        }
+
+        public ref struct Writer
+        {
+            private int* _state;
+            private T* _value;
+            internal Writer(int* state, T* value) { _state = state; _value = value; }
+            public ref T Value => ref *_value;
+            ~Writer() { *_state = 0; }
+        }
+    }
+}

@@ -1,0 +1,13 @@
+namespace System.Runtime.CompilerServices
+{
+    [InterpolatedStringHandler]
+    public ref struct DefaultInterpolatedStringHandler
+    {
+        private System.Text.StringBuilder _sb;
+        public DefaultInterpolatedStringHandler(int literalLength, int formattedCount) { _sb = new System.Text.StringBuilder(); }
+        public void AppendLiteral(string s) { _sb.Append(s); }
+        public void AppendFormatted(string s) { _sb.Append(s); }
+        public void AppendFormatted<T>(in T value) { _sb.Append(value.ToString()); }
+        public string ToStringAndClear() => _sb.ToString();
+    }
+}

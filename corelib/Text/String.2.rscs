@@ -1,0 +1,78 @@
+namespace System
+{
+    public sealed unsafe partial class String
+    {
+        public static int CompareOrdinal(in string a, in string b)
+        {
+            if (a == (object)null || b == (object)null) return a == (object)null ? (b == (object)null ? 0 : -1) : 1;
+            int n = a._length < b._length ? a._length : b._length;
+            int c = Libc.memcmp(a._data, b._data, n);
+            if (c != 0) return c < 0 ? -1 : 1;
+            return a._length < b._length ? -1 : a._length > b._length ? 1 : 0;
+        }
+
+        public override readonly int GetHashCode()
+        {
+            int h = 17;
+            for (int i = 0; i < _length; i++) h = h * 31 + _data[i];
+            return h;
+        }
+
+        /// <summary>A new string with the same text: Rust's to_string() on a &str.</summary>
+        public override readonly string ToString() => FromUtf8(_data, _length);
+
+        private readonly void CheckBoundary(int i)
+        {
+            if (i < 0 || i > _length) Panic.Raise("byte index " + i.ToString() + " is out of bounds of the string");
+            if (i < _length && (_data[i] & 0xC0) == 0x80) Panic.Raise("byte index " + i.ToString() + " is not a char boundary");
+        }
+
+        /// <summary>Bytes from `start`, `length` long. Both ends must lie on char boundaries, as in Rust.</summary>
+        public readonly string Substring(int start, int length)
+        {
+            CheckBoundary(start);
+            CheckBoundary(start + length);
+            if (length < 0) Panic.Raise("substring out of range");
+            return FromUtf8(_data + start, length);
+        }
+
+        public readonly string Substring(int start) => Substring(start, _length - start);
+
+        /// <summary>Byte index of the first `c`, or -1. Rust's find returns an Option: see Find.</summary>
+        public readonly int IndexOf(char c) => IndexOf(new string(c, 1));
+
+        public readonly int IndexOf(in string needle)
+        {
+            for (int i = 0; i + needle._length <= _length; i++)
+                if (Libc.memcmp(_data + i, needle._data, needle._length) == 0) return i;
+            return -1;
+        }
+
+        public readonly Option<int> Find(in string needle)
+        {
+            int i = IndexOf(in needle);
+            return i < 0 ? Option<int>.None : Option<int>.Some(i);
+        }
+
+        public readonly bool Contains(in string needle) => IndexOf(in needle) >= 0;
+
+        public readonly bool StartsWith(in string prefix)
+            => prefix._length <= _length && Libc.memcmp(_data, prefix._data, prefix._length) == 0;
+
+        public readonly bool EndsWith(in string suffix)
+            => suffix._length <= _length && Libc.memcmp(_data + _length - suffix._length, suffix._data, suffix._length) == 0;
+
+        /// <summary>`count` times the char c.</summary>
+        public String(char c, int count)
+        {
+            var one = Rune.Encode(c, out int n);
+            _rc = 1;
+            _length = n * count;
+            _capacity = _length;
+            _data = NewBuffer(_length);
+            for (int i = 0; i < count; i++)
+                for (int k = 0; k < n; k++) _data[i * n + k] = (byte)(one >> (8 * k));
+            _data[_length] = 0;
+        }
+    }
+}

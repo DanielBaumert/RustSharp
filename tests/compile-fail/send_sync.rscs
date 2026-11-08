@@ -1,0 +1,31 @@
+using System;
+using System.Threading;
+class Plain { public int V; }
+class WithRc { public Rc<int> Shared = new Rc<int>(1); }
+unsafe class WithPointer { public int* P; }
+class Bad { public static readonly Rc<int> Global = new Rc<int>(1); } // error: CS9924
+class P
+{
+    static unsafe void Main()
+    {
+        var rc = new Rc<int>(1);
+        var t1 = Thread.Run(move () => rc.Value); // error: CS9923
+
+        var holder = new WithRc();
+        var t2 = Thread.Run(move () => holder.Shared.Count); // error: CS9923
+
+        var raw = new WithPointer();
+        var t3 = Thread.Run(move () => raw.P == null); // error: CS9923
+
+        var arcOfRc = new Arc<Rc<int>>(new Rc<int>(1));
+        var t4 = Thread.Run(move () => arcOfRc.Count); // error: CS9923
+
+        var noLock = new Arc<Plain>(new Plain());
+        var t5 = Thread.Run(move () => noLock.Value.V);
+
+        object o = new Plain();
+        var t6 = Thread.Run(move () => o is Plain); // error: CS9923
+
+        Console.WriteLine(Bad.Global.Count);
+    }
+}

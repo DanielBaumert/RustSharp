@@ -1,0 +1,18 @@
+namespace System
+{
+    /// <summary>
+    /// The payload of a panic, and the only exception type. Nothing throws or catches it; the
+    /// corelib throws it in Panic.Raise and catches it where a thread or task ends, as Rust's
+    /// catch_unwind does in std and tokio.
+    /// </summary>
+    internal class Exception
+    {
+        internal Option<string> _location = Option<string>.None;
+        internal bool _reported;
+        private string _message;
+        public Exception() { _message = "exception"; }
+        public Exception(string message) { _message = message; }
+        public virtual string Message => _message;
+        public override readonly string ToString() => _message;
+    }
+}

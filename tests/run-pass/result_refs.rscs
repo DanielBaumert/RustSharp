@@ -1,0 +1,59 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+[Clone] class Big { public int N; public Big(int n) { N = n; } public override readonly string ToString() => "Big" + N.ToString(); }
+class P
+{
+    static Result<int, string> Parse(string s) => s.Length > 0 ? Result<int, string>.Ok(s.Length) : Result<int, string>.Err("empty");
+
+    // A function that hands out a reference into its argument, like `fn first(r: &Result<..>) -> Option<&T>`.
+    static Option<Ref<int>> Value(in Result<int, string> r) => r.AsRef().Ok();
+
+    static void Main()
+    {
+        mut var r = Parse("hello");
+
+        // as_ref: look without taking anything out
+        var view = r.AsRef();
+        Console.WriteLine(view.Unwrap().Value);
+        Console.WriteLine(r.IsOk);
+
+        // as_mut: change the value in place
+        var edit = r.AsMut();
+        edit.Unwrap().Value = 42;
+        Console.WriteLine(r);
+
+        mut var failed = Parse("");
+        failed.AsMut().UnwrapErr().Value = "changed";
+        Console.WriteLine(failed);
+
+        // a borrowed value travels through Option and back
+        var inner = Value(in r);
+        Console.WriteLine(inner.Unwrap().Value + 1);
+
+        // iteration
+        foreach (ref var v in r.IterMut()) v = v * 2;
+        Console.WriteLine(r);
+        foreach (var v in r.Iter()) Console.WriteLine(v);
+
+        // cloned and copied turn references back into values
+        var big = Result<Big, string>.Ok(new Big(7));
+        var cloned = big.AsRef().Cloned();
+        Console.WriteLine(cloned + " " + big);
+        Console.WriteLine(r.AsRef().Copied().Unwrap() + 1);
+
+        // as_deref: through a smart pointer
+        var shared = Result<Rc<int>, string>.Ok(new Rc<int>(5));
+        Console.WriteLine(shared.AsDeref().Unwrap().Value);
+        var arc = Result<Arc<string>, string>.Ok(new Arc<string>("arc"));
+        Console.WriteLine(arc.AsDeref().Unwrap().Value);
+        mut var boxed = Result<Box<int>, string>.Ok(new Box<int>(10));
+        boxed.AsDerefMut().Unwrap().Value += 5;
+        Console.WriteLine(boxed.AsDeref().Unwrap().Value);
+        Console.WriteLine(boxed.Unwrap().Unbox());
+
+        // consuming checks, as in Rust
+        Console.WriteLine(Parse("abc").IsOkAnd(n => n == 3));
+        Console.WriteLine(Parse("").IsErrAnd(e => e == "empty"));
+    }
+}

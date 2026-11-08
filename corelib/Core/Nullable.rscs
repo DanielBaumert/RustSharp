@@ -1,0 +1,13 @@
+namespace System
+{
+    public struct Nullable<T> where T : struct
+    {
+        private bool hasValue;
+        private T value;
+        public Nullable(T value) { this.hasValue = true; this.value = value; }
+        public readonly bool HasValue => hasValue;
+        // A bitwise read: Nullable is meant for Copy payloads, like the C# types it stands in for.
+        public unsafe readonly T Value { get { if (!hasValue) Panic.Raise("called `Option::unwrap()` on a `None` value"); return Mem.Read(Mem.AddressOf(in value)); } }
+        public unsafe readonly T GetValueOrDefault() => Mem.Read(Mem.AddressOf(in value));
+    }
+}

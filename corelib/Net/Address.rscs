@@ -1,0 +1,88 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    internal static unsafe class Address
+    {
+        [DllImport("c")] private static extern int inet_pton(int family, byte* text, void* dst);
+        [DllImport("c")] private static extern byte* inet_ntop(int family, void* src, byte* dst, uint size);
+
+        private static byte* CString(in string s)
+        {
+            int n;
+            byte* p = s.ToUtf8(out n);
+            p[n] = 0;
+            return p;
+        }
+
+        /// <summary>Numeric IPv4 or IPv6 addresses, and localhost. Everything else goes through Dns.</summary>
+        public static bool TryParse(string host, int port, Sockaddr* a)
+        {
+            byte* b = (byte*)a;
+            for (int i = 0; i < 112; i++) b[i] = 0;
+            if (host == "localhost") host = "127.0.0.1";
+            byte* text = CString(in host);
+            bool ok;
+            if (inet_pton(2, text, b + 4) == 1)
+            {
+                *(ushort*)b = 2;
+                a->Length = 16;
+                a->Family = 2;
+                ok = true;
+            }
+            else if (inet_pton(10, text, b + 8) == 1)
+            {
+                *(ushort*)b = 10;
+                a->Length = 28;
+                a->Family = 10;
+                ok = true;
+            }
+            else
+            {
+                ok = false;
+            }
+            Libc.free(text);
+            b[2] = (byte)(port >> 8);
+            b[3] = (byte)port;
+            return ok;
+        }
+
+        public static bool Unix(string path, Sockaddr* a)
+        {
+            byte* b = (byte*)a;
+            for (int i = 0; i < 112; i++) b[i] = 0;
+            int n;
+            byte* text = path.ToUtf8(out n);
+            if (n > 107)
+            {
+                Libc.free(text);
+                return false;
+            }
+            *(ushort*)b = 1;
+            for (int i = 0; i < n; i++) b[2 + i] = text[i];
+            Libc.free(text);
+            a->Length = 2 + n + 1;
+            a->Family = 1;
+            return true;
+        }
+
+        public static string Host(Sockaddr* a)
+        {
+            byte* b = (byte*)a;
+            byte* text = (byte*)Libc.malloc(64);
+            int family = *(ushort*)b;
+            inet_ntop(family, family == 2 ? b + 4 : b + 8, text, 64);
+            string s = String.FromUtf8(text, (int)Libc.strlen(text));
+            Libc.free(text);
+            return s;
+        }
+
+        public static int Port(Sockaddr* a) => (((byte*)a)[2] << 8) | ((byte*)a)[3];
+
+        public static string ErrorText(string what) => what + " failed, errno " + Sys.Errno.ToString();
+    }
+}

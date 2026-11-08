@@ -1,0 +1,67 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+class P
+{
+    static Option<int> Some(int v) => Option<int>.Some(v);
+    static Option<int> None => Option<int>.None;
+    static Option<int> Half(int x) => x % 2 == 0 ? Some(x / 2) : None;
+
+    static void Main()
+    {
+        // checks
+        Console.WriteLine(Some(3).IsSomeAnd(v => v > 2) + " " + None.IsSomeAnd(v => true));
+        Console.WriteLine(None.IsNoneOr(v => false) + " " + Some(1).IsNoneOr(v => v > 5));
+
+        // references
+        mut var o = Some(5);
+        Console.WriteLine(o.AsRef().Unwrap().Value);
+        o.AsMut().Unwrap().Value += 1;
+        Console.WriteLine(o);
+        Console.WriteLine(o.AsRef().Copied().Unwrap() + o.AsRef().Cloned().Unwrap());
+        var boxed = Option<Box<int>>.Some(new Box<int>(9));
+        Console.WriteLine(boxed.AsDeref().Unwrap().Value);
+
+        // fallbacks
+        Console.WriteLine(None.UnwrapOr(1) + " " + None.UnwrapOrElse(() => 2) + " " + None.UnwrapOrDefault() + " " + Some(4).Expect("set"));
+
+        // transforming
+        Console.WriteLine(Some(2).Map(v => v * 10) + " " + None.Map(v => v * 10));
+        Console.WriteLine(Some(2).MapOr(0, v => v + 1) + " " + None.MapOr(0, v => v + 1));
+        Console.WriteLine(Some(2).MapOrElse(() => -1, v => v * 3) + " " + None.MapOrElse(() => -1, v => v * 3));
+        mut int seen = 0;
+        Console.WriteLine(Some(7).Inspect((in int v) => { seen = v; }) + " " + seen.ToString());
+        Console.WriteLine(Some(1).OkOr("missing") + " " + None.OkOr("missing"));
+        Console.WriteLine(None.OkOrElse(() => "computed"));
+        Console.WriteLine(Some(4).Filter((in int v) => v % 2 == 0) + " " + Some(3).Filter((in int v) => v % 2 == 0));
+
+        // chaining
+        Console.WriteLine(Some(1).And(Option<string>.Some("b")) + " " + None.And(Option<string>.Some("b")));
+        Console.WriteLine(Some(8).AndThen(Half).AndThen(Half) + " " + Some(6).AndThen(Half).AndThen(Half));
+        Console.WriteLine(None.Or(Some(9)) + " " + None.OrElse(() => Some(10)));
+        Console.WriteLine(Some(1).Xor(None) + " " + Some(1).Xor(Some(2)) + " " + None.Xor(Some(3)));
+        Console.WriteLine(Some(1).Zip(Option<string>.Some("a")).Unwrap().Item2 + " " + Some(1).Zip(Option<string>.None).IsNone);
+        var (left, right) = Option<(int, string)>.Some((5, "five")).Unzip();
+        Console.WriteLine(left + " " + right);
+
+        // changing in place
+        mut var slot = None;
+        Console.WriteLine(slot.Replace(1) + " " + slot);
+        Console.WriteLine(slot.GetOrInsert(5) + " " + slot);
+        slot.Insert(7);
+        Console.WriteLine(slot.TakeIf((in int v) => v > 10) + " " + slot);
+        Console.WriteLine(slot.TakeIf((in int v) => v == 7) + " " + slot);
+        Console.WriteLine(slot.GetOrInsertWith(() => 11));
+        Console.WriteLine(slot.Take() + " " + slot);
+
+        // nested and iteration
+        Console.WriteLine(Option<Result<int, string>>.Some(Result<int, string>.Ok(1)).Transpose());
+        Console.WriteLine(Option<Result<int, string>>.None.Transpose());
+        Console.WriteLine(Option<Result<int, string>>.Some(Result<int, string>.Err("e")).Transpose());
+        Console.WriteLine(Option<Option<int>>.Some(Some(3)).Flatten() + " " + Option<Option<int>>.Some(None).Flatten());
+        mut var iterated = Some(20);
+        foreach (ref var v in iterated.IterMut()) v += 1;
+        foreach (var v in iterated.Iter()) Console.WriteLine(v);
+        Console.WriteLine(None.Iter().Count(x => true) + iterated.Iter().Sum());
+    }
+}

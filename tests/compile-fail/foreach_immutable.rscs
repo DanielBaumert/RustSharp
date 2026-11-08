@@ -1,0 +1,8 @@
+using System.Collections.Generic;
+class P
+{
+    static void Main()
+    {
+        foreach (var x in new List<int>()) { x = 1; } // error: CS1656
+    }
+}

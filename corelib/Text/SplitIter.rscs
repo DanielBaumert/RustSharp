@@ -1,0 +1,62 @@
+namespace System.Text
+{
+    /// <summary>The parts of a str: Split and Lines.</summary>
+    public unsafe ref struct SplitIter : System.Linq.IIter<str>
+    {
+        private str _rest;
+        private str _separator;
+        private bool _lines;
+        private bool _done;
+        private str _current;
+        private uint _charBytes;
+        private int _charLength;
+
+        internal SplitIter(str text, str separator, bool lines)
+        {
+            _rest = text;
+            _separator = separator;
+            _lines = lines;
+            _done = lines && text.Length == 0;
+            _current = default;
+            _charBytes = 0;
+            _charLength = 0;
+        }
+
+        internal SplitIter(str text, char separator) : this(text, default, false)
+        {
+            _charBytes = Rune.Encode(separator, out _charLength);
+        }
+
+        public str* Next()
+        {
+            if (_done) return null;
+            byte* p = _rest.Data;
+            int n = _rest.Length;
+            int cut = -1, skip = 0;
+            if (_lines)
+            {
+                for (int i = 0; i < n; i++) if (p[i] == '\n') { cut = i; skip = 1; break; }
+            }
+            else
+            {
+                int m = _charLength > 0 ? _charLength : _separator.Length;
+                byte* sep = _charLength > 0 ? (byte*)Mem.AddressOf(in _charBytes) : _separator.Data;
+                for (int i = 0; i + m <= n; i++) if (Libc.memcmp(p + i, sep, m) == 0) { cut = i; skip = m; break; }
+            }
+            if (cut < 0)
+            {
+                _done = true;
+                _current = _rest;
+                if (_lines && n == 0) return null;
+            }
+            else
+            {
+                int end = _lines && cut > 0 && p[cut - 1] == '\r' ? cut - 1 : cut;
+                _current = new str(p, end);
+                _rest = new str(p + cut + skip, n - cut - skip);
+                if (_lines && _rest.Length == 0) _done = true;
+            }
+            return Mem.AddressOf(in _current);
+        }
+    }
+}

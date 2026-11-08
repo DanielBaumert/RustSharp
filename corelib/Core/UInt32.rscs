@@ -1,0 +1,4 @@
+namespace System
+{
+    public readonly partial struct UInt32 { public override string ToString() => Number.Format((long)this); public override int GetHashCode() => (int)this; }
+}

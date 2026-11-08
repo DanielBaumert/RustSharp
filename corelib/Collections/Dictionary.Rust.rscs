@@ -1,0 +1,43 @@
+namespace System.Collections.Generic
+{
+    /// <summary>Rust's HashMap methods.</summary>
+    public unsafe partial class Dictionary<K, V>
+    {
+        public Option<V> Insert(K key, V value) => Add(key, value);
+        public readonly int Len => Count;
+        public readonly bool IsEmpty => Count == 0;
+
+        public Option<RefMut<V>> GetMut(in K key)
+        {
+            int i = Find(in key);
+            return i < 0 ? Option<RefMut<V>>.None : Option<RefMut<V>>.Some(RefMut<V>.Of(ref _entries[i].Value));
+        }
+
+        /// <summary>Rust's entry(key).or_insert(value): the value for key, inserted first if missing.</summary>
+        public ref V OrInsert(K key, V value)
+        {
+            if (Find(in key) < 0) Set(Mem.CloneOf(in key), value);
+            return ref this[in key];
+        }
+
+        public ref V OrInsertWith(K key, Func<V> make)
+        {
+            if (Find(in key) < 0) Set(Mem.CloneOf(in key), make());
+            return ref this[in key];
+        }
+
+        public readonly List<K> Keys()
+        {
+            var keys = new List<K>();
+            foreach (ref readonly var e in this) keys.Add(Mem.CloneOf(in e.Key));
+            return keys;
+        }
+
+        public readonly List<V> Values()
+        {
+            var values = new List<V>();
+            foreach (ref readonly var e in this) values.Add(Mem.CloneOf(in e.Value));
+            return values;
+        }
+    }
+}

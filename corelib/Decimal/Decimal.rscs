@@ -1,0 +1,151 @@
+namespace System
+{
+    /// <summary>
+    /// 96-bit integer mantissa with a decimal scale of 0 to 28. Intermediate results use 256-bit
+    /// little-endian buffers; rounding is half to even, as in .NET.
+    /// </summary>
+    public readonly unsafe partial struct Decimal
+    {
+        private const int Words = 8;
+        private const int MaxScale = 28;
+
+        private readonly uint _lo;
+        private readonly uint _mid;
+        private readonly uint _hi;
+        private readonly int _flags;
+
+        public const decimal MaxValue = 79228162514264337593543950335m;
+        public const decimal MinValue = -79228162514264337593543950335m;
+        public static readonly decimal Zero = new decimal(0);
+        public static readonly decimal One = new decimal(1);
+        public static readonly decimal MinusOne = new decimal(-1);
+
+        public Decimal(int value) : this((long)value) { }
+        public Decimal(uint value) : this((ulong)value) { }
+
+        public Decimal(long value)
+        {
+            ulong m = value < 0 ? (ulong)(-value) : (ulong)value;
+            _lo = (uint)m;
+            _mid = (uint)(m >> 32);
+            _hi = 0;
+            _flags = value < 0 ? unchecked((int)0x80000000) : 0;
+        }
+
+        public Decimal(ulong value)
+        {
+            _lo = (uint)value;
+            _mid = (uint)(value >> 32);
+            _hi = 0;
+            _flags = 0;
+        }
+
+        public Decimal(int lo, int mid, int hi, bool isNegative, byte scale)
+        {
+            _lo = (uint)lo;
+            _mid = (uint)mid;
+            _hi = (uint)hi;
+            _flags = (scale << 16) | (isNegative ? unchecked((int)0x80000000) : 0);
+        }
+
+        public Decimal(double value)
+        {
+            decimal d = FromFloat(value, 15);
+            _lo = d._lo;
+            _mid = d._mid;
+            _hi = d._hi;
+            _flags = d._flags;
+        }
+
+        public Decimal(float value)
+        {
+            decimal d = FromFloat(value, 7);
+            _lo = d._lo;
+            _mid = d._mid;
+            _hi = d._hi;
+            _flags = d._flags;
+        }
+
+        private static decimal FromFloat(double value, int digits)
+        {
+            if (value >= 7.9228162514264338e28 || value <= -7.9228162514264338e28 || value != value)
+            {
+                Fail(Overflowed, "value is out of range for a decimal");
+                return default;
+            }
+            return ParseOrPanic(Number.Format(value, digits));
+        }
+
+        private static int ScaleOf(decimal d) => (d._flags >> 16) & 0xFF;
+        private static bool IsNeg(decimal d) => d._flags < 0;
+
+        private static void Load(decimal d, uint* w)
+        {
+            w[0] = d._lo;
+            w[1] = d._mid;
+            w[2] = d._hi;
+            for (int i = 3; i < Words; i++) w[i] = 0;
+        }
+
+        private static void Clear(uint* w) { for (int i = 0; i < Words; i++) w[i] = 0; }
+        private static void Copy(uint* from, uint* to) { for (int i = 0; i < Words; i++) to[i] = from[i]; }
+
+        private static bool IsZero(uint* w)
+        {
+            for (int i = 0; i < Words; i++)
+                if (w[i] != 0) return false;
+            return true;
+        }
+
+        private static bool Fits(uint* w)
+        {
+            for (int i = 3; i < Words; i++)
+                if (w[i] != 0) return false;
+            return true;
+        }
+
+        private static void MulSmall(uint* w, uint m)
+        {
+            ulong carry = 0;
+            for (int i = 0; i < Words; i++)
+            {
+                ulong v = (ulong)w[i] * m + carry;
+                w[i] = (uint)v;
+                carry = v >> 32;
+            }
+        }
+
+        private static void AddSmall(uint* w, uint a)
+        {
+            ulong carry = a;
+            for (int i = 0; i < Words && carry != 0; i++)
+            {
+                ulong v = (ulong)w[i] + carry;
+                w[i] = (uint)v;
+                carry = v >> 32;
+            }
+        }
+
+        private static uint DivSmall(uint* w, uint d)
+        {
+            ulong r = 0;
+            for (int i = Words - 1; i >= 0; i--)
+            {
+                ulong v = (r << 32) | w[i];
+                w[i] = (uint)(v / d);
+                r = v % d;
+            }
+            return (uint)r;
+        }
+
+        private static int Compare(uint* a, uint* b)
+        {
+            for (int i = Words - 1; i >= 0; i--)
+            {
+                if (a[i] < b[i]) return -1;
+                if (a[i] > b[i]) return 1;
+            }
+            return 0;
+        }
+    }
+}

@@ -1,0 +1,50 @@
+using System;
+using System.Collections.Generic;
+// No null: a value that may be missing is an Option<T>, and `T?` is a short way to write one.
+class Node
+{
+    public Node? Next = None;
+    public string Name;
+    public Node(string name) { Name = name; }
+}
+class Empty
+{
+    public string Name; // error: CS8618
+}
+struct Pair { public string A; public int B; }
+class P
+{
+    static int Length(string? s) => s.Length; // error: CS1061
+    static int Safe(string? s) => s.MapOr(0, v => v.Length);
+    static string Missing() => null; // error: CS9935
+    static string? Nothing() => None;
+    static int Code(int x) => x switch { 1 => 10, 2 => 20 }; // error: CS8509
+    static int Total(int x) => x switch { 1 => 10, _ => 20 };
+    static int Open(int? o) => o switch { Some(var v) => v }; // error: CS8509
+    static int Closed(int? o) => o switch { Some(var v) => v, None => 0 };
+    static T Zero<T>() => default(T); // error: CS9938
+    static void Main()
+    {
+        string s = null; // error: CS9935
+        if (s == null) return; // error: CS9935
+        var n = new Node("a");
+        Console.WriteLine(n.Next.Name); // error: CS1061
+        int? i = 5; // error: CS0029
+        int j = Nothing().Map(t => t.Length); // error: CS0029
+        string fallback = s ?? "x"; // error: CS9937
+        int len = s!.Length; // error: CS9937
+        var q = s?.Length; // error: CS9937
+        object o = new Node("b");
+        var cast = o as Node; // error: CS9937
+        string[] names = new string[3]; // error: CS9938
+        int[] zeros = new int[3];
+        string d = default; // error: CS9938
+        Pair p = new Pair(); // error: CS9938
+        Pair full = new Pair { A = "a", B = 1 };
+        mut var list = new List<string>();
+        var taken = Mem.Take(ref list); // error: CS0311
+        var sb = new System.Text.StringBuilder();
+        sb.Append("a").Append("b"); // error: CS0023
+    }
+}
+#nullable disable // error: CS9936

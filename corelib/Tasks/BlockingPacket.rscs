@@ -1,0 +1,29 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    internal unsafe struct BlockingPacket<T>
+    {
+        public System.Threading.ThreadWork<T> Work;
+        public SharedResult<T> Shared;
+
+        public static void* Entry(void* raw)
+        {
+            var p = (BlockingPacket<T>*)raw;
+            System.Threading.ThreadWork<T> work = Mem.Read(Mem.AddressOf(in p->Work));
+            SharedResult<T> shared = Mem.Read(Mem.AddressOf(in p->Shared));
+            Libc.free(p);
+            Startup.s_threadName = 1;
+            try
+            {
+                shared.Finish(Option<T>.Some(work()), Option<Exception>.None);
+            }
+            catch (Exception e)
+            {
+                Startup.Report(ref e);
+                shared.Finish(Option<T>.None, Option<Exception>.Some(e));
+            }
+            return null;
+        }
+    }
+}

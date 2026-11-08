@@ -1,0 +1,27 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Net.Sockets;
+
+namespace System.Threading.Tasks
+{
+    internal sealed unsafe class SignalTask : Task<int>
+    {
+        private int _fd;
+        public SignalTask(int fd) { _fd = fd; }
+        internal override bool PollCore()
+        {
+            while (true)
+            {
+                long value = 0;
+                long r = Sys.read(_fd, &value, 8);
+                if (r == 8)
+                {
+                    _result = Some((int)value);
+                    return true;
+                }
+                if (Reactor.Wait(_fd, false)) return false;
+            }
+        }
+    }
+}

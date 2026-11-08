@@ -1,0 +1,191 @@
+using System;
+using System.Collections.Generic;
+using System.Net.Sockets;
+using System.Threading;
+using System.Threading.Tasks;
+
+class Noisy
+{
+    public string Name;
+    public Noisy(string name) { Name = name; }
+    ~Noisy() { Console.WriteLine("dropped " + Name); }
+}
+
+class P
+{
+    static async IAsyncEnumerable<int> Squares(int n)
+    {
+        for (mut int i = 0; i < n; i++)
+        {
+            await Task.Yield();
+            yield return i * i;
+        }
+    }
+
+    // Holds an Rc across awaits: this task has to stay on one thread while others are stolen.
+    static async Task<int> Pinned(int rounds)
+    {
+        var shared = new Rc<int>(7);
+        var other = shared.Clone();
+        long thread = Thread.CurrentId;
+        mut int moved = 0;
+        for (mut int i = 0; i < rounds; i++)
+        {
+            await Task.Yield();
+            if (Thread.CurrentId != thread) moved++;
+        }
+        return moved + other.Value - 7;
+    }
+
+    static async Task<long> Spin(int rounds)
+    {
+        mut long sum = 0;
+        for (mut int i = 0; i < rounds; i++)
+        {
+            await Task.Yield();
+            sum += i;
+        }
+        return sum;
+    }
+
+    // Never waits for anything that is not ready, so only the budget lets others run.
+    static async Task<int> Greedy(Receiver<int> rx)
+    {
+        mut int n = 0;
+        while (true)
+        {
+            if (!(await rx.ReceiveAsync() is Some(var value))) return n;
+            n += value;
+        }
+    }
+
+    static async Task<int> Forever()
+    {
+        var keep = new Noisy("cancelled task");
+        await Task.Delay(100000);
+        return keep.Name.Length;
+    }
+
+    static async Task<int> UnixEcho(UnixListener l)
+    {
+        mut var c = (await l.AcceptAsync()).Unwrap();
+        string line = (await c.ReadLineAsync()).Unwrap().UnwrapOr("");
+        (await c.WriteAsync(line + "!\n")).Unwrap();
+        return line.Length;
+    }
+
+    static async Task<int> V6Echo(TcpListener l)
+    {
+        mut var c = (await l.AcceptAsync()).Unwrap();
+        string line = (await c.ReadLineAsync()).Unwrap().UnwrapOr("");
+        (await c.WriteAsync(line + "?\n")).Unwrap();
+        return line.Length;
+    }
+
+    static async Task<int> Waiter(Notify n)
+    {
+        await n.NotifiedAsync();
+        return 5;
+    }
+
+    static async Task<int> Follower(mut Watch<int> w)
+    {
+        while (w.Get() < 3) await w.ChangedAsync();
+        return w.Get();
+    }
+
+    static async Task<int> Subscriber(Receiver<int> rx)
+    {
+        mut int sum = 0;
+        while (true)
+        {
+            if (!(await rx.ReceiveAsync() is Some(var v))) return sum;
+            sum += v;
+        }
+    }
+
+    static async Task<int> Main()
+    {
+        mut int total = 0;
+        await foreach (var x in Squares(5)) total += x;
+        Console.WriteLine(total);
+
+        mut var spins = new List<JoinHandle<long>>();
+        for (mut int i = 0; i < 16; i++) spins.Add(Task.Run(move () => Spin(2000)));
+        var pinned = Task.Run(move () => Pinned(2000));
+        mut long sum = 0;
+        for (mut int i = 0; i < 16; i++) sum += (await spins.RemoveAt(0)).Unwrap();
+        Console.WriteLine(sum);
+        Console.WriteLine((await pinned).Unwrap());
+
+        var (tx, rx) = Channel.Create<int>();
+        for (mut int i = 0; i < 5000; i++) tx.Send(1);
+        var greedy = Task.Run(move () => Greedy(rx));
+        Mem.Drop(tx);
+        Console.WriteLine((await greedy).Unwrap());
+
+        var udpA = UdpSocket.Bind("127.0.0.1", 0).Unwrap();
+        var udpB = UdpSocket.Bind("127.0.0.1", 0).Unwrap();
+        mut byte[] datagram = new byte[3];
+        datagram[0] = 1;
+        datagram[1] = 2;
+        datagram[2] = 3;
+        (await udpA.SendToAsync(in datagram, 3, "127.0.0.1", udpB.LocalPort)).Unwrap();
+        mut byte[] inbox = new byte[16];
+        var (n, host, port) = (await udpB.ReceiveFromAsync(ref inbox)).Unwrap();
+        Console.WriteLine(n.ToString() + " " + host + " " + (port == udpA.LocalPort).ToString() + " " + inbox[2].ToString());
+
+        var unixPath = "/tmp/rustsharp-test-" + Thread.CurrentId.ToString() + ".sock";
+        var unix = UnixListener.Bind(unixPath).Unwrap();
+        var unixServer = Task.Run(move () => UnixEcho(unix));
+        mut var unixClient = (await UnixStream.ConnectAsync(unixPath)).Unwrap();
+        (await unixClient.WriteAsync("unix\n")).Unwrap();
+        Console.WriteLine((await unixClient.ReadLineAsync()).Unwrap().Unwrap());
+        Console.WriteLine((await unixServer).Unwrap());
+
+        var v6 = TcpListener.Bind("::1", 0).Unwrap();
+        int v6Port = v6.LocalPort;
+        var v6Server = Task.Run(move () => V6Echo(v6));
+        mut var v6Client = (await TcpStream.ConnectAsync("::1", v6Port)).Unwrap();
+        (await v6Client.WriteAsync("six\n")).Unwrap();
+        Console.WriteLine((await v6Client.ReadLineAsync()).Unwrap().Unwrap());
+        Console.WriteLine((await v6Server).Unwrap());
+
+        string resolved = (await Dns.ResolveAsync("localhost")).Unwrap();
+        Console.WriteLine(resolved == "127.0.0.1" || resolved == "::1");
+
+        var notify = new Notify();
+        var other = notify.Clone();
+        var waiter = Task.Run(move () => Waiter(other));
+        notify.NotifyOne();
+        Console.WriteLine((await waiter).Unwrap());
+
+        var watch = new Watch<int>(0);
+        var view = watch.Clone();
+        var follower = Task.Run(move () => Follower(view));
+        for (mut int i = 1; i <= 3; i++)
+        {
+            watch.Set(i);
+            await Task.Yield();
+        }
+        Console.WriteLine((await follower).Unwrap());
+
+        var broadcast = new Broadcast<int>();
+        var s1 = broadcast.Subscribe();
+        var s2 = broadcast.Subscribe();
+        var t1 = Task.Run(move () => Subscriber(s1));
+        var t2 = Task.Run(move () => Subscriber(s2));
+        for (mut int i = 1; i <= 4; i++) broadcast.Send(in i);
+        broadcast.Close();
+        Console.WriteLine((await t1).Unwrap() + (await t2).Unwrap());
+
+        var signal = Signal.WaitAsync(Signal.User1);
+        Signal.Raise(Signal.User1);
+        Console.WriteLine(await signal);
+
+        var cancelled = Task.Run(move () => Forever());
+        await Task.Delay(5);
+        Console.WriteLine("main done");
+        return 0;
+    }
+}

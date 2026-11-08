@@ -1,0 +1,7 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>A piece of work that a worker can step.</summary>
+    internal interface IJob { bool Step(); }
+}

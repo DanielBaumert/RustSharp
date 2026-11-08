@@ -1,0 +1,23 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    internal sealed class TimeoutTask<T> : Task<Result<T, Elapsed>>
+    {
+        private Option<Task<T>> _task;
+        private Task _delay;
+        public TimeoutTask(Task<T> task, int ms) { _task = Option<Task<T>>.Some(task); _delay = new DelayTask(ms); }
+        internal override bool PollCore()
+        {
+            if (_task.SlotMut.Poll())
+            {
+                _result = Some(Result<T, Elapsed>.Ok(_task.SlotMut.TakeResult()));
+                return true;
+            }
+            if (!_delay.Poll()) return false;
+            _task = Option<Task<T>>.None; // dropping the task cancels it
+            _result = Some(Result<T, Elapsed>.Err(new Elapsed()));
+            return true;
+        }
+    }
+}

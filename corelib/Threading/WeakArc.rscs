@@ -1,0 +1,27 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    [SendWhen(Bound.Send | Bound.Sync), SyncWhen(Bound.Send | Bound.Sync)]
+    public unsafe struct WeakArc<T>
+    {
+        private ArcBox<T>* _p;
+        internal WeakArc(ArcBox<T>* p) { _p = p; }
+
+        public readonly Option<Arc<T>> Upgrade()
+        {
+            long* strong = Mem.AddressOf(in _p->Strong);
+            while (true)
+            {
+                long n = Atomic.Load(strong);
+                if (n == 0) return Option<Arc<T>>.None;
+                if (Atomic.CompareExchange(strong, n, n + 1) == n) return Option<Arc<T>>.Some(new Arc<T>(_p));
+            }
+        }
+
+        ~WeakArc()
+        {
+            if (_p != null && Atomic.Add(Mem.AddressOf(in _p->Weak), -1L) == 1) Libc.free(_p);
+        }
+    }
+}

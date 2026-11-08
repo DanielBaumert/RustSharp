@@ -1,0 +1,21 @@
+using System;
+using System.Threading;
+// exit: 101
+class P
+{
+    static int Check(int x)
+    {
+        if (x > 2) Panic.Raise("x is too big: " + x.ToString());
+        return x;
+    }
+    static void Main()
+    {
+        var worker = Thread.Run<int>(move () => Check(5));
+        var joined = worker.Join();
+        Console.WriteLine(joined.IsErr);
+        Console.WriteLine(joined.UnwrapErr().Message);
+        var list = new System.Collections.Generic.List<int>();
+        Console.WriteLine(int.Parse("12").Unwrap() + (int.Parse("x").IsErr ? 1 : 0));
+        Check(3);
+    }
+}

@@ -1,0 +1,55 @@
+using System;
+// A trait with default methods takes the place of an abstract base class.
+interface IShape
+{
+    readonly double Area();
+    readonly string Name() => "shape";
+    readonly string Describe() => Name() + " area=" + Area().ToString();
+}
+class Circle : IShape
+{
+    double _r;
+    public Circle(double r) { _r = r; }
+    public readonly double Area() => 3.0 * _r * _r;
+    public readonly string Name() => "circle";
+}
+class Square : IShape
+{
+    double _s;
+    public Square(double s) { _s = s; }
+    public readonly double Area() => _s * _s;
+}
+class Counter
+{
+    int _n;
+    public int N { get => _n; set => _n = value; }
+    public void Inc() { _n++; }
+}
+[Copy] enum Color { Red, Green = 5, Blue }
+class P
+{
+    static readonly int Answer = Compute();
+    static int Compute() => 42;
+    static void Show(in IShape s) { Console.WriteLine(s.Name()); }
+    static void Main()
+    {
+        IShape a = new Circle(2.0);
+        IShape b = new Square(3.0);
+        Console.WriteLine(a.Describe());
+        Console.WriteLine(b.Describe());
+        IShape i = new Square(1.0);
+        Console.WriteLine(i.Area());
+        Show(in i);
+        mut var c = new Counter();
+        c.Inc(); c.Inc();
+        c.N = c.N + 10;
+        Console.WriteLine(c.N);
+        Console.WriteLine(Answer);
+        Color k = Color.Blue;
+        Console.WriteLine((int)k);
+        Console.WriteLine(k == Color.Blue);
+        object boxed = 41;
+        int back = (int)boxed + 1;
+        Console.WriteLine(back);
+    }
+}

@@ -1,0 +1,44 @@
+using System;
+using System.Linq;
+class P
+{
+    static void Main()
+    {
+        string word = "grüße";
+        Console.WriteLine(word.Length);                 // bytes, like len()
+        Console.WriteLine(word.Chars().Count(c => true)); // chars
+        foreach (var c in word.Chars()) Console.Write(c.ToString() + "|");
+        Console.WriteLine();
+        Console.WriteLine(word.Bytes().First().Unwrap());
+
+        mut string s = "ab";
+        s.Push('c');
+        s.Push(new Rune(0x1F600));
+        s.PushStr("!");
+        Console.WriteLine(s + " " + s.Length.ToString());
+        Console.WriteLine(s.Pop().Unwrap().ToString() + s.Pop().Unwrap().Value.ToString());
+
+        // A clone shares nothing visible: changing one leaves the other alone.
+        mut string a = "hello";
+        string b = a.Clone();
+        a.PushStr(" world");
+        Console.WriteLine(a + "|" + b);
+        a.Truncate(2);
+        a.Insert(1, 'X');
+        Console.WriteLine(a);
+        a.Clear();
+        Console.WriteLine(a.IsEmpty);
+
+        // A literal is a String of its own each time it is used.
+        for (mut int i = 0; i < 2; i++)
+        {
+            mut string t = "x";
+            t.Push('y');
+            Console.WriteLine(t);
+        }
+
+        Console.WriteLine("  pad  ".Trim() + "|" + "a,b,,c".Split(',').Count().ToString() + "|" + "Hi".ToUpper() + "|" + "ab".Repeat(3));
+        Console.WriteLine("hello".Find("ll").Unwrap() + " " + "hello".Find("z").IsNone + " " + "hello".Replace("l", "L"));
+        Console.WriteLine(word.Substring(0, 4)); // "grü": ü takes two bytes
+    }
+}

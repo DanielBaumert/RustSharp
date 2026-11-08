@@ -1,0 +1,68 @@
+using System;
+enum Op { Add, Sub, Mul }
+class P
+{
+    static int Apply(Op op, int a, int b)
+    {
+        switch (op)
+        {
+            case Op.Add: return a + b;
+            case Op.Sub: return a - b;
+            default: return a * b;
+        }
+    }
+    static string Size(int n) => n switch { 0 => "zero", < 10 => "small", _ => "big" };
+    static string Word(string s)
+    {
+        switch (s)
+        {
+            case "a": return "first";
+            case "b": return "second";
+            default: return "other";
+        }
+    }
+    static int Fib(int n) => n < 2 ? n : Fib(n - 1) + Fib(n - 2);
+    delegate int Bin(int a, int b);
+    static int Mul(int a, int b) => a * b;
+    static void Main()
+    {
+        Console.WriteLine(Apply(Op.Add, 2, 3));
+        Console.WriteLine(Apply(Op.Mul, 2, 3));
+        Console.WriteLine(Size(0) + Size(5) + Size(50));
+        Console.WriteLine(Word("b") + Word("z"));
+        Console.WriteLine(Fib(20));
+        mut int[] a = new int[] { 3, 1, 2 };
+        mut int t = 0;
+        foreach (var x in a) t = t * 10 + x;
+        Console.WriteLine(t);
+        Console.WriteLine(a.Length);
+        for (mut int i = 0; i < a.Length; i++)
+            for (mut int j = i + 1; j < a.Length; j++)
+                if (a[j] < a[i]) { int s = a[i]; a[i] = a[j]; a[j] = s; }
+        Console.WriteLine(a[0] * 100 + a[1] * 10 + a[2]);
+        string[] names = { "x", "y" };
+        foreach (var n in names) Console.Write(n);
+        Console.WriteLine();
+        mut int w = 0;
+        while (true) { w++; if (w > 3) break; }
+        do { w--; } while (w > 0);
+        Console.WriteLine(w);
+        Bin f = Mul;
+        Console.WriteLine(f(6, 7));
+        long big = 1L << 40;
+        Console.WriteLine(big >> 38);
+        uint u = 0xFFFFFFFF;
+        Console.WriteLine(u);
+        Console.WriteLine(7 / 2 + 7 % 2);
+        Console.WriteLine(-7 / 2);
+        Console.WriteLine(1.5 * 2);
+        byte bb = unchecked((byte)300);
+        Console.WriteLine((int)bb);
+        int? maybe = Some(5);
+        Console.WriteLine(maybe.IsSome);
+        Console.WriteLine(maybe.Unwrap() + 1);
+        string? nothing = None;
+        Console.WriteLine(nothing.AsRef().Map(s => s.Value.Length).IsNone);
+        Console.WriteLine(nothing.UnwrapOr("fallback"));
+    }
+}

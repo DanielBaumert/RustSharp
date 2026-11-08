@@ -1,0 +1,85 @@
+namespace System
+{
+    /// <summary>Rust's str methods that read.</summary>
+    public sealed unsafe partial class String
+    {
+        /// <summary>The chars (Unicode scalar values), like Rust's chars().</summary>
+        public readonly System.Linq.Query<Rune, Text.CharsIter> Chars()
+            => new System.Linq.Query<Rune, Text.CharsIter>(new Text.CharsIter(_data, _length));
+
+        /// <summary>The UTF-8 bytes, like Rust's bytes().</summary>
+        public readonly System.Linq.Query<byte, System.Linq.SliceIter<byte>> Bytes()
+            => new System.Linq.Query<byte, System.Linq.SliceIter<byte>>(new System.Linq.SliceIter<byte>(_data, _length));
+
+        /// <summary>The whole string as a str: Rust's as_str().</summary>
+        public readonly str AsStr() => new str(_data, _length);
+
+        /// <summary>A str into these bytes: `&amp;s[start..start + length]`. Substring copies instead.</summary>
+        public readonly str Slice(int start, int length) => AsStr().Slice(start, length);
+
+        /// <summary>`&amp;s[a..b]`: a str into these bytes, no copy. The ends must be char boundaries.</summary>
+        public readonly str this[Range range] => AsStr()[range];
+
+        public readonly str Trim() => AsStr().Trim();
+        public readonly str TrimStart() => AsStr().TrimStart();
+        public readonly str TrimEnd() => AsStr().TrimEnd();
+        public readonly System.Linq.Query<str, Text.SplitIter> Lines() => AsStr().Lines();
+
+        /// <summary>ASCII letters change case; everything else stays, like to_ascii_uppercase.</summary>
+        public readonly string ToUpper() => MapAscii(true);
+        public readonly string ToLower() => MapAscii(false);
+
+        private readonly string MapAscii(bool upper)
+        {
+            string r = FromUtf8(_data, _length);
+            for (int i = 0; i < _length; i++)
+            {
+                byte b = r._data[i];
+                if (upper && b >= 'a' && b <= 'z') r._data[i] = (byte)(b - 32);
+                if (!upper && b >= 'A' && b <= 'Z') r._data[i] = (byte)(b + 32);
+            }
+            return r;
+        }
+
+        public readonly string Replace(in string from, in string to)
+        {
+            var result = new Text.StringBuilder();
+            int i = 0;
+            while (i < _length)
+            {
+                if (from._length > 0 && i + from._length <= _length && Libc.memcmp(_data + i, from._data, from._length) == 0)
+                {
+                    result.AppendRef(in to);
+                    i += from._length;
+                }
+                else
+                {
+                    result.AppendByte(_data[i++]);
+                }
+            }
+            return result.ToString();
+        }
+
+        /// <summary>The parts between separators, lazily, like split(); empty parts are kept.</summary>
+        public readonly System.Linq.Query<str, Text.SplitIter> Split(char separator) => AsStr().Split(separator);
+
+        /// <summary>The items' text with `separator` between them, like Rust's join.</summary>
+        public static string Join<T>(string separator, in Collections.Generic.List<T> items)
+        {
+            var b = new Text.StringBuilder();
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (i > 0) b.AppendRef(in separator);
+                b.AppendRef(items.At(i).ToString());
+            }
+            return b.ToString();
+        }
+
+        public readonly string Repeat(int n)
+        {
+            string r = Allocate(_length * n);
+            for (int i = 0; i < n; i++) Libc.memcpy(r._data + i * _length, _data, _length);
+            return r;
+        }
+    }
+}

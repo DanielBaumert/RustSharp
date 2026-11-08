@@ -1,0 +1,10 @@
+class P
+{
+    static dynamic Make() => 1; // error: CS9933
+    static void Main()
+    {
+        dynamic d = 1; // error: CS9933
+        var dynamicName = 2;
+        System.Console.WriteLine(dynamicName);
+    }
+}

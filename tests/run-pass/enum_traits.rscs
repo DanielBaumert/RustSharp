@@ -1,0 +1,31 @@
+using System;
+interface ICool<T> { readonly T a(); readonly string Describe() => $"cool {a()}"; }
+
+// Rust: enum Abx { A, B, C }  impl Cool<i32> for Abx { ... }
+enum Abx : ICool<int>
+{
+    A, B, C;
+
+    public readonly int a() => this switch { Abx.A => 1, Abx.B => 2, Abx.C => 3 };
+}
+
+enum Shape : ICool<double>
+{
+    Circle(double R),
+    Square(double S);
+
+    public readonly double a() => this switch { Circle(var r) => 3 * r * r, Square(var s) => s * s };
+}
+
+class P
+{
+    static string Show<T, V>(in T x) where T : ICool<V> => x.Describe();
+    static void Main()
+    {
+        Abx b = new Abx.B();
+        Console.WriteLine(b.a() + " " + b);
+        Console.WriteLine(Show<Abx, int>(in b));
+        ICool<double> s = new Shape.Square(3);
+        Console.WriteLine(s.Describe());
+    }
+}

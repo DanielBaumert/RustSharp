@@ -1,0 +1,14 @@
+class P
+{
+    static ref int Both(ref int a, ref int b) { return ref a; } // error: CS9916
+    static ref 'a int Named(ref 'a int x, ref 'b int y) { return ref y; } // error: CS9915
+    static ref 'a int Ok(ref 'a int x, ref 'b int y) { return ref x; }
+    static void Main()
+    {
+        mut int a = 1, b = 2;
+        ref int r = ref Ok(ref a, ref b);
+        b = 3;
+        a = 4; // error: CS9907
+        r = 5;
+    }
+}

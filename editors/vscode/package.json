@@ -1,0 +1,220 @@
+{
+  "name": "rustsharp",
+  "displayName": "RustSharp",
+  "description": "C# syntax with Rust semantics: ownership and borrow errors as you type, hover, go to definition, run and build with rustsharp.",
+  "version": "0.6.0",
+  "publisher": "rustsharp",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:rustsharp",
+    "workspaceContains:**/rustsharp"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "rustsharp",
+        "aliases": [
+          "RustSharp",
+          "RustSharp",
+          "rustsharp"
+        ],
+        "extensions": [
+          ".rscs"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "rustsharp",
+        "scopeName": "source.rscs",
+        "path": "./syntaxes/rustsharp.tmLanguage.json"
+      },
+      {
+        "scopeName": "rustsharp.injection",
+        "path": "./syntaxes/rustsharp.injection.json",
+        "injectTo": [
+          "source.rscs"
+        ]
+      }
+    ],
+    "snippets": [
+      {
+        "language": "rustsharp",
+        "path": "./snippets/rustsharp.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "rustsharp.run",
+        "title": "Run File",
+        "category": "RustSharp",
+        "icon": "$(play)"
+      },
+      {
+        "command": "rustsharp.build",
+        "title": "Build File",
+        "category": "RustSharp"
+      },
+      {
+        "command": "rustsharp.check",
+        "title": "Check File (borrow checker)",
+        "category": "RustSharp"
+      },
+      {
+        "command": "rustsharp.showMir",
+        "title": "Show MIR",
+        "category": "RustSharp"
+      },
+      {
+        "command": "rustsharp.showLlvm",
+        "title": "Show LLVM IR",
+        "category": "RustSharp"
+      },
+      {
+        "command": "rustsharp.restartServer",
+        "title": "Restart Language Server",
+        "category": "RustSharp"
+      }
+    ],
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "rustsharp.run",
+          "when": "editorLangId == rustsharp",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "rustsharp.run",
+          "when": "editorLangId == rustsharp"
+        },
+        {
+          "command": "rustsharp.build",
+          "when": "editorLangId == rustsharp"
+        },
+        {
+          "command": "rustsharp.check",
+          "when": "editorLangId == rustsharp"
+        },
+        {
+          "command": "rustsharp.showMir",
+          "when": "editorLangId == rustsharp"
+        },
+        {
+          "command": "rustsharp.showLlvm",
+          "when": "editorLangId == rustsharp"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "rustsharp.run",
+        "key": "ctrl+f5",
+        "when": "editorLangId == rustsharp"
+      }
+    ],
+    "configuration": {
+      "title": "RustSharp",
+      "properties": {
+        "rustsharp.compilerPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to rustsharp. Empty: a rustsharp at the root of a workspace folder, otherwise rustsharp on the PATH."
+        },
+        "rustsharp.optimization": {
+          "type": "string",
+          "enum": [
+            "-O0",
+            "-O1",
+            "-O2",
+            "-O3"
+          ],
+          "default": "-O2",
+          "description": "Optimization level for Run and Build."
+        },
+        "rustsharp.sanitizer": {
+          "type": "string",
+          "enum": [
+            "none",
+            "asan",
+            "tsan"
+          ],
+          "default": "none",
+          "description": "Run under AddressSanitizer or ThreadSanitizer (built with -O0)."
+        }
+      }
+    },
+    "problemMatchers": [
+      {
+        "name": "rustsharp",
+        "owner": "rustsharp",
+        "fileLocation": [
+          "autoDetect",
+          "${workspaceFolder}"
+        ],
+        "pattern": [
+          {
+            "regexp": "^(error|warning)\\[(CS\\d+)\\]: (.*)$",
+            "severity": 1,
+            "code": 2,
+            "message": 3
+          },
+          {
+            "regexp": "^\\s+--> (.*):(\\d+):(\\d+)$",
+            "file": 1,
+            "line": 2,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "name": "rustsharp-panic",
+        "owner": "rustsharp",
+        "fileLocation": [
+          "autoDetect",
+          "${workspaceFolder}"
+        ],
+        "pattern": [
+          {
+            "regexp": "^thread '.*' panicked at (.*):(\\d+):(\\d+):$",
+            "file": 1,
+            "line": 2,
+            "column": 3
+          },
+          {
+            "regexp": "^(.*)$",
+            "message": 1
+          }
+        ]
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "rustsharp",
+        "required": [
+          "file"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "The source file."
+          },
+          "args": {
+            "type": "array",
+            "description": "Extra rustsharp options."
+          }
+        }
+      }
+    ]
+  }
+}

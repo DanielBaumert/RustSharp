@@ -1,0 +1,40 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    public sealed class TcpStream : SocketStream
+    {
+        internal unsafe TcpStream(int fd) : base(fd)
+        {
+            int one = 1;
+            Sys.setsockopt(fd, 6, 1, &one, 4); // TCP_NODELAY
+        }
+
+        internal static TcpStream Make(int fd) => new TcpStream(fd);
+
+        /// <summary>Host names are resolved first; numeric addresses and localhost connect directly.</summary>
+        public static async Task<Result<TcpStream, IoError>> ConnectAsync(string host, int port)
+        {
+            string resolved = host;
+            if (!IsNumeric(host, port)) resolved = (await Dns.ResolveAsync(host))?;
+            return await Start(resolved, port);
+        }
+
+        private static unsafe bool IsNumeric(string host, int port)
+        {
+            Sockaddr a = default;
+            return Address.TryParse(host, port, &a);
+        }
+
+        private static unsafe Task<Result<TcpStream, IoError>> Start(string host, int port)
+        {
+            Sockaddr a = default;
+            if (!Address.TryParse(host, port, &a)) return IoTask<TcpStream>.Failed("invalid address " + host);
+            return new ConnectTask<TcpStream>(a, &Make);
+        }
+    }
+}

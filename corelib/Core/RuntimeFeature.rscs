@@ -1,0 +1,12 @@
+namespace System.Runtime.CompilerServices
+{
+    public static class RuntimeFeature
+    {
+        public const string ByRefFields = "ByRefFields";
+        public const string ByRefLikeGenerics = "ByRefLikeGenerics";
+        public const string UnmanagedSignatureCallingConvention = "UnmanagedSignatureCallingConvention";
+        public const string DefaultImplementationsOfInterfaces = "DefaultImplementationsOfInterfaces";
+        public const string VirtualStaticsInInterfaces = "VirtualStaticsInInterfaces";
+        public const string NumericIntPtr = "NumericIntPtr";
+    }
+}

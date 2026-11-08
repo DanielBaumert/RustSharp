@@ -1,0 +1,73 @@
+namespace System.Collections.Generic
+{
+    /// <summary>Rust's Vec methods.</summary>
+    public unsafe partial class List<T>
+    {
+        public void Push(T item) { Add(item); }
+        public Option<T> Pop() => RemoveLast();
+        public readonly int Len => _count;
+        public readonly bool IsEmpty => _count == 0;
+
+        public readonly Option<Ref<T>> Get(int i) => (uint)i < (uint)_count ? Option<Ref<T>>.Some(Ref<T>.Of(in *(_items + i))) : Option<Ref<T>>.None;
+        public Option<RefMut<T>> GetMut(int i) => (uint)i < (uint)_count ? Option<RefMut<T>>.Some(RefMut<T>.Of(ref *(_items + i))) : Option<RefMut<T>>.None;
+
+        /// <summary>Removes the element at i and returns it; the order of the rest stays.</summary>
+        public T Remove(int i) => RemoveAt(i);
+
+        /// <summary>Removes the element at i, filling the gap with the last one: O(1).</summary>
+        public T SwapRemove(int i)
+        {
+            if ((uint)i >= (uint)_count) Panic.Raise("swap_remove index (is " + i.ToString() + ") should be < len (is " + _count.ToString() + ")");
+            T item = Mem.Read(_items + i);
+            _count--;
+            if (i != _count) Mem.Write(_items + i, Mem.Read(_items + _count));
+            return item;
+        }
+
+        public void Swap(int a, int b)
+        {
+            if ((uint)a >= (uint)_count || (uint)b >= (uint)_count) Panic.Raise("index out of bounds in swap");
+            T t = Mem.Read(_items + a);
+            Mem.Write(_items + a, Mem.Read(_items + b));
+            Mem.Write(_items + b, t);
+        }
+
+        public void Truncate(int n)
+        {
+            while (_count > n) { _count--; Mem.DropInPlace(_items + _count); }
+        }
+
+        /// <summary>Keeps the elements for which keep holds, in order.</summary>
+        public void Retain(System.Linq.Predicate<T> keep)
+        {
+            int o = 0;
+            for (int i = 0; i < _count; i++)
+            {
+                if (keep(in *(_items + i))) { if (o != i) Mem.Write(_items + o, Mem.Read(_items + i)); o++; }
+                else Mem.DropInPlace(_items + i);
+            }
+            _count = o;
+        }
+
+        /// <summary>Removes consecutive equal elements.</summary>
+        public void Dedup()
+        {
+            if (_count < 2) return;
+            int o = 1;
+            for (int i = 1; i < _count; i++)
+            {
+                if (Mem.EqualOf(in *(_items + i), in *(_items + o - 1))) Mem.DropInPlace(_items + i);
+                else { if (o != i) Mem.Write(_items + o, Mem.Read(_items + i)); o++; }
+            }
+            _count = o;
+        }
+
+        /// <summary>Moves every element of other to the end.</summary>
+        public void Extend(List<T> other)
+        {
+            while (other.Len > 0) Add(other.Remove(0));
+        }
+
+        public readonly System.Linq.Query<T, System.Linq.SliceIter<T>> Iter() => new System.Linq.Query<T, System.Linq.SliceIter<T>>(new System.Linq.SliceIter<T>(_items, _count));
+    }
+}

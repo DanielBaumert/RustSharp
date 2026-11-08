@@ -1,0 +1,19 @@
+using System.Collections.Generic;
+using System.Threading;
+
+namespace System.Threading.Tasks
+{
+    internal sealed unsafe class AcquireTask<T> : Task<T>
+    {
+        private WaitState* _s;
+        private delegate*<WaitState*, T> _make;
+        public AcquireTask(WaitState* s, delegate*<WaitState*, T> make) { _s = WaitState.Retain(s); _make = make; }
+        ~AcquireTask() { WaitState.Release(_s); }
+        internal override bool PollCore()
+        {
+            if (!WaitState.TryAcquire(_s)) return false;
+            _result = Some(_make(_s));
+            return true;
+        }
+    }
+}

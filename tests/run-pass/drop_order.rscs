@@ -1,0 +1,51 @@
+using System;
+class Noisy
+{
+    string _name;
+    public Noisy(string name) { Console.WriteLine("new " + name); _name = name; }
+    ~Noisy() { Console.WriteLine("drop " + _name); }
+    public readonly string Name => _name;
+}
+class Holder
+{
+    public Noisy A;
+    public Noisy B;
+    public Holder(Noisy a, Noisy b) { A = a; B = b; }
+    ~Holder() { Console.WriteLine("drop holder"); }
+}
+class Plain
+{
+    public Noisy A;
+    public Noisy B;
+    public Plain(Noisy a, Noisy b) { A = a; B = b; }
+}
+class P
+{
+    static void Consume(Noisy n) { Console.WriteLine("consume " + n.Name); }
+    static Noisy Pass(Noisy n) => n;
+    static void Main()
+    {
+        var a = new Noisy("a");
+        {
+            var b = new Noisy("b");
+            Console.WriteLine("inner end");
+        }
+        var c = new Noisy("c");
+        Consume(c);
+        Console.WriteLine("after consume");
+        var d = Pass(new Noisy("d"));
+        mut var e = new Noisy("e");
+        e = new Noisy("e2");
+        Console.WriteLine("after reassign");
+        var h = new Holder(new Noisy("h1"), new Noisy("h2"));
+        Console.WriteLine(h.A.Name);
+        var plain = new Plain(new Noisy("p1"), new Noisy("p2"));
+        var taken = plain.A;
+        Console.WriteLine("took " + taken.Name);
+        for (mut int i = 0; i < 2; i++)
+        {
+            var loop = new Noisy("loop");
+        }
+        Console.WriteLine("end");
+    }
+}

@@ -1,0 +1,35 @@
+using System;
+using System.Collections.Generic;
+
+class File
+{
+    string _name;
+    public File(string name) { Console.WriteLine("open " + name); _name = name; }
+    ~File() { Console.WriteLine("close " + _name); }
+    public readonly string Name => _name;
+}
+
+
+class Program
+{
+    static void Archive(File f) => Console.WriteLine("archived " + f.Name);
+    static ref 'a int Larger(ref 'a int a, ref 'a int b) { if (a > b) return ref a; return ref b; }
+
+    static void Main()
+    {
+        var log = new File("log.txt");
+        Archive(log);                     // ownership moves into Archive, which closes the file
+        Console.WriteLine("moved on");
+
+        mut int x = 1, y = 2;
+        Larger(ref x, ref y) = 10;        // writes through a checked borrow
+        Console.WriteLine(y);
+
+        mut var names = new List<string>();
+        names.Add("ada");
+        names.Add("grace");
+        foreach (var n in names) Console.WriteLine($"hello {n}");
+    }
+}
+
+

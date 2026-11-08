@@ -1,0 +1,60 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+class Person
+{
+    public string Name;
+    public int Age;
+    public Person(string n, int a) { Name = n; Age = a; }
+}
+class P
+{
+    // Rust: fn adults(people: &[Person]) -> Vec<&Person>
+    static List<Ref<Person>> Adults(in List<Person> people)
+    {
+        mut var result = new List<Ref<Person>>();
+        foreach (ref readonly var p in people)
+            if (p.Age >= 18) result.Add(Ref<Person>.Of(in p));
+        return result;
+    }
+
+    static void Main()
+    {
+        mut var people = new List<Person>();
+        people.Add(new Person("Ada", 36));
+        people.Add(new Person("Tim", 12));
+        people.Add(new Person("Grace", 45));
+
+        // A list of references into another list, like Vec<&Person>.
+        var adults = Adults(in people);
+        foreach (var a in adults) Console.WriteLine(a.Value.Name);
+        Console.WriteLine(adults.Count);
+
+        // References to locals in a list, a stack and a dictionary.
+        int x = 1, y = 2, z = 3;
+        mut var nums = new List<Ref<int>>();
+        nums.Add(Ref<int>.Of(in x));
+        nums.Add(Ref<int>.Of(in y));
+        Console.WriteLine(nums[0].Value + nums[1].Value);
+        mut var stack = new Stack<Ref<int>>();
+        stack.Push(Ref<int>.Of(in z));
+        Console.WriteLine(stack.Pop().Unwrap().Value);
+        mut var byName = new Dictionary<string, Ref<int>>();
+        byName.Add("x", Ref<int>.Of(in x));
+        Console.WriteLine(byName["x"].Value);
+
+        // Mutable references in a list.
+        mut int a1 = 10, a2 = 20;
+        {
+            mut var targets = new List<RefMut<int>>();
+            targets.Add(RefMut<int>.Of(ref a1));
+            targets.Add(RefMut<int>.Of(ref a2));
+            for (mut int i = 0; i < targets.Count; i++) targets[i].Value += 1;
+        }
+        Console.WriteLine(a1 + a2);
+
+        // An Option of a reference out of a list.
+        Option<Ref<Person>> first = adults.AsQuery().First();
+        Console.WriteLine(first.Unwrap().Value.Age);
+    }
+}

@@ -1,0 +1,26 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>Rust's Waker: tells the runtime that a suspended task should be polled again.</summary>
+    [SendWhen(Bound.Always), SyncWhen(Bound.Always)]
+    public unsafe struct Waker : IClone<Waker>
+    {
+        private TaskRecord* _record;
+        internal Waker(TaskRecord* record) { _record = record; }
+
+        /// <summary>Rust's Waker::noop: wakes nothing. CurrentWaker gives it outside the runtime.</summary>
+        public static Waker Noop => new Waker(null);
+        public readonly bool IsNoop => _record == null;
+
+        public readonly Waker Clone()
+        {
+            if (_record != null) Atomic.Add(Mem.AddressOf(in _record->Refs), 1L);
+            return new Waker(_record);
+        }
+
+        public readonly void Wake() { if (_record != null) Runtime.Schedule(_record); }
+
+        ~Waker() { if (_record != null) Runtime.Release(_record); }
+    }
+}

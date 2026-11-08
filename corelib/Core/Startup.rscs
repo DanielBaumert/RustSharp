@@ -1,0 +1,92 @@
+namespace System
+{
+    public static unsafe class Startup
+    {
+        // The compiler raises runtime faults through these.
+        public static void RunMain(System.Threading.Tasks.Task main)
+        {
+            System.Threading.Tasks.Runtime.BlockOn(main);
+            System.Threading.Tasks.Runtime.Shutdown();
+        }
+
+        public static int RunMainInt(System.Threading.Tasks.Task<int> main)
+        {
+            int code = System.Threading.Tasks.Runtime.BlockOn(main);
+            System.Threading.Tasks.Runtime.Shutdown();
+            return code;
+        }
+
+        public static object FaultNull() => Located(new PanicException("called a member on a null reference"));
+        public static object FaultBounds() => Located(new PanicException("index out of bounds"));
+        public static object FaultDivideByZero() => Located(new PanicException("attempt to divide by zero"));
+        public static object FaultCast() => Located(new PanicException("invalid cast"));
+        public static object FaultOverflow() => Located(new PanicException("arithmetic operation overflowed"));
+
+        private static object Located(Exception e)
+        {
+            Remember(ref e);
+            return e;
+        }
+
+        // Like Rust's panic hook, the message appears where the panic starts, before destructors run.
+        private static void Remember(ref Exception e)
+        {
+            if (e._location.IsNone) e._location = Option<string>.Some(Mem.PanicLocation());
+            Report(ref e);
+        }
+
+
+        /// <summary>Called by the compiler when a panic starts: a panic remembers where user code was.</summary>
+        public static void OnThrow(object e)
+        {
+            Exception ex = (Exception)e;
+            Remember(ref ex);
+            Mem.Forget(ex); // the thrown object stays with the thrower
+        }
+
+        // 0 main, 1 a thread of Thread.Run or RunBlocking, 2 a runtime worker; a number, so no string leaks per thread.
+        [ThreadStatic] internal static int s_threadName;
+        private static int s_noted;
+
+        /// <summary>Rust's panic message. It is printed once, where the panic leaves its thread or task.</summary>
+        internal static void Report(ref Exception ex)
+        {
+            if (ex._reported) return;
+            ex._reported = true;
+            string name = s_threadName == 2 ? "tokio-runtime-worker" : s_threadName == 1 ? "<unnamed>" : "main";
+            string at = ex._location.AsRef().MapOr("<unknown>", l => l.Value.Clone());
+            Console.ErrorWrite("thread '" + name + "' panicked at " + at + ":\n" + ex.Message + "\n");
+            if (System.Threading.Atomic.CompareExchange(Mem.AddressOf(in s_noted), 0, 1) == 0)
+                Console.ErrorWrite("note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n");
+        }
+
+        /// <summary>Rust's Termination for Result: Ok is exit code 0, Err prints the error and is 1.</summary>
+        public static int MainResult<T, E>(Result<T, E> result)
+        {
+            if (result.IsOk) return 0;
+            Console.ErrorWrite("Error: " + result.UnwrapErr().ToString() + "\n");
+            return 1;
+        }
+
+        public static int RunMainResult<T, E>(System.Threading.Tasks.Task<Result<T, E>> main)
+        {
+            var result = System.Threading.Tasks.Runtime.BlockOn(main);
+            System.Threading.Tasks.Runtime.Shutdown();
+            return MainResult(result);
+        }
+
+        public static void ReportUnhandled(object e)
+        {
+            Exception ex = (Exception)e;
+            Report(ref ex);
+        }
+
+        public static string[] MakeArgs(int argc, byte** argv)
+        {
+            string[] args = Mem.UninitArray<string>(argc - 1);
+            for (int i = 1; i < argc; i++)
+                Mem.Write(Mem.AddressOf(in args[i - 1]), String.FromUtf8(argv[i], (int)Libc.strlen(argv[i])));
+            return args;
+        }
+    }
+}

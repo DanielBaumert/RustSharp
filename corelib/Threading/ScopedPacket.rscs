@@ -1,0 +1,24 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    /// <summary>A scoped thread's work: it may borrow, like a closure given to `thread::scope`.</summary>
+    [ScopedSend, Once] public delegate void ScopedWork();
+
+    internal unsafe struct ScopedPacket
+    {
+        // calloc'd: zeroed memory is None
+        public Option<ScopedWork> Work;
+        public Option<Exception> Error;
+        public ulong Id;
+
+        public static void* Entry(void* raw)
+        {
+            var p = (ScopedPacket*)raw;
+            ScopedWork work = p->Work.Take().Unwrap();
+            try { work(); }
+            catch (Exception e) { p->Error = Option<Exception>.Some(e); }
+            return null;
+        }
+    }
+}

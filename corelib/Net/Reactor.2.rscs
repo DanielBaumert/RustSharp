@@ -1,0 +1,90 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    internal static unsafe partial class Reactor
+    {
+
+        /// <summary>Fires what is due and returns the milliseconds until the next timer, or -1.</summary>
+        private static int RunTimers()
+        {
+            var due = new System.Collections.Generic.List<TimerEntry>();
+            long now = TaskRuntime.NowMs();
+            long next = -1;
+            Pthread.pthread_mutex_lock(s_lock);
+            ref var timers = ref Mem.AsRef(s_timers);
+            int i = 0;
+            while (i < timers.Count)
+            {
+                long deadline = timers.At(i).Deadline;
+                if (deadline <= now)
+                {
+                    due.Add(timers.RemoveAt(i));
+                }
+                else
+                {
+                    if (next < 0 || deadline < next) next = deadline;
+                    i++;
+                }
+            }
+            Pthread.pthread_mutex_unlock(s_lock);
+            for (int k = 0; k < due.Count; k++)
+            {
+                due[k].Fired.Value.Set(1);
+                due[k].Waker.Wake();
+            }
+            return next < 0 ? -1 : (int)(next - now);
+        }
+
+        private static void Dispatch(int fd, uint events)
+        {
+            Option<Waker> read = Option<Waker>.None, write = Option<Waker>.None;
+            Pthread.pthread_mutex_lock(s_lock);
+            IoSlot* slot = Slot(fd);
+            if (slot->Registered != 0)
+            {
+                if ((events & (In | Err | Hup)) != 0)
+                {
+                    read = slot->Read.Take();
+                    if (read.IsIdle()) slot->ReadReady = 1;
+                }
+                if ((events & (Out | Err | Hup)) != 0)
+                {
+                    write = slot->Write.Take();
+                    if (write.IsIdle()) slot->WriteReady = 1;
+                }
+            }
+            Pthread.pthread_mutex_unlock(s_lock);
+            read.Wake();
+            write.Wake();
+        }
+
+        private static void* Loop(void* raw)
+        {
+            byte* events = (byte*)Libc.malloc(EventSize * 256);
+            while (true)
+            {
+                int timeout = RunTimers();
+                int n = Sys.epoll_wait(s_epoll, events, 256, timeout);
+                for (int i = 0; i < n; i++)
+                {
+                    byte* ev = events + i * EventSize;
+                    int fd = (int)*(ulong*)(ev + 4);
+                    if (fd == s_wake)
+                    {
+                        long ignored;
+                        Sys.read(s_wake, &ignored, 8);
+                    }
+                    else
+                    {
+                        Dispatch(fd, *(uint*)ev);
+                    }
+                }
+            }
+        }
+    }
+}

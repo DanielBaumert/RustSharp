@@ -1,0 +1,55 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+delegate Task<int> Work(int x);
+class P
+{
+    static async Task<int> Twice(int x) { await Task.Yield(); return x * 2; }
+    static IEnumerable<int> Evens(int n)
+    {
+        for (mut int i = 0; i < n; i += 2) yield return i;
+    }
+    static async Task Main()
+    {
+        int offset = 5;
+        Work add = async x => { await Task.Yield(); return x + offset; };
+        Console.WriteLine(await add(1));
+
+        var t = Task.Run(move async () =>
+        {
+            await Task.Delay(1);
+            return await Twice(21);
+        });
+        Console.WriteLine((await t).Unwrap());
+
+        string name = "cap";
+        var s = Task.Run(move async () =>
+        {
+            await Task.Yield();
+            return name + "tured";
+        });
+        Console.WriteLine((await s).Unwrap());
+
+        mut var results = new List<int>();
+        foreach (var e in Evens(6)) results.Add(await Twice(e));
+        Console.WriteLine(results.AsQuery().Sum());
+
+        var m = new Arc<Mutex<int>>(new Mutex<int>(0));
+        mut var jobs = new List<JoinHandle<int>>();
+        for (mut int i = 0; i < 4; i++)
+        {
+            var c = m.Clone();
+            jobs.Add(Task.Run(move async () =>
+            {
+                await Task.Yield();
+                mut var g = c.Value.Lock();
+                g.Value = g.Value + 1;
+                return 0;
+            }));
+        }
+        while (jobs.Count > 0) await jobs.RemoveAt(0);
+        Console.WriteLine(m.Value.Lock().Value);
+    }
+}

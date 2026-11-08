@@ -1,0 +1,52 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+class P
+{
+    // Rust: fn first_word(s: &str) -> &str
+    static str FirstWord(str s)
+    {
+        int space = s.IndexOf(" ");
+        return space < 0 ? s : s.Slice(0, space);
+    }
+
+    // A literal is a 'static str, so it may leave the function.
+    static str Greeting() => "hello";
+
+    static void Main()
+    {
+        string text = "  alpha beta  ";
+        str trimmed = text.Trim();
+        Console.WriteLine("[" + trimmed + "]");
+        Console.WriteLine(FirstWord(trimmed));
+        Console.WriteLine(Greeting().Length);
+
+        string csv = "a,b,,c";
+        foreach (var part in csv.Split(',')) Console.Write("<" + part.ToString() + ">");
+        Console.WriteLine();
+        Console.WriteLine(csv.Split(',').Count());
+
+        string lines = "one\ntwo\r\nthree";
+        foreach (var line in lines.Lines()) Console.Write(line.ToString() + "|");
+        Console.WriteLine();
+
+        // &s[a..b]: a slice, no copy; ^n counts from the end.
+        string hello = "hello world";
+        str world = hello[6..];
+        Console.WriteLine(world + " " + hello[..5] + " " + hello[^3..]);
+        Console.WriteLine(world[1..3]);
+
+        str s = "x=42";
+        Console.WriteLine(s.Split("=").Count());
+        Console.WriteLine(s.Slice(2, 2).ParseInt().Unwrap() + 1);
+        Console.WriteLine(s.StartsWith("x") + " " + s.Contains("4") + " " + (s == "x=42"));
+
+        // References into a string can live in a list, like Vec<&str>.
+        string sentence = "the quick brown fox";
+        mut var words = new List<str>();
+        foreach (var w in sentence.Split(' ')) words.Add(w);
+        Console.WriteLine(words.Count + " " + words[2]);
+        string owned = words[1].ToOwned();
+        Console.WriteLine(owned.Length);
+    }
+}

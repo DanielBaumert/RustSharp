@@ -1,0 +1,59 @@
+namespace System
+{
+    /// <summary>Rust's Clone. Implement it by hand, or derive it with [Clone].</summary>
+    public interface IClone<T> { readonly T Clone(); }
+
+    /// <summary>Rust's #[derive(Clone)]: the compiler clones the type field by field.</summary>
+    public sealed class CloneAttribute : Attribute { }
+
+    /// <summary>On a type parameter: the type argument must be Copy, like Rust's `T: Copy`.</summary>
+    public sealed class CopyAttribute : Attribute { }
+
+    /// <summary>On Ref and RefMut: the struct is a reference, Rust's &amp;T or &amp;mut T.</summary>
+    public sealed class ReferenceAttribute : Attribute { }
+
+    /// <summary>On Result and Option: they may hold references, and then live no longer than what those borrow.</summary>
+    public sealed class CarriesBorrowsAttribute : Attribute { }
+
+    public enum Bound { Never = 0, Always = 1, Send = 2, Sync = 4 }
+
+    /// <summary>Overrides the derived Send rule, like `unsafe impl Send`: the type's arguments must meet the bound.</summary>
+    public sealed class SendWhenAttribute : Attribute { public SendWhenAttribute(Bound bound) { } }
+
+    /// <summary>Overrides the derived Sync rule, like `unsafe impl Sync`.</summary>
+    public sealed class SyncWhenAttribute : Attribute { public SyncWhenAttribute(Bound bound) { } }
+
+    /// <summary>On a delegate type: what it captures must be Send, like `dyn Fn() + Send`.</summary>
+    public sealed class SendAttribute : Attribute { }
+
+    /// <summary>Values of this type must not stay alive across an `await`: Rust's #[must_not_suspend].</summary>
+    public sealed class MustNotSuspendAttribute : Attribute { }
+
+    /// <summary>On a delegate type: it runs at most once, like Rust's FnOnce.</summary>
+    public sealed class OnceAttribute : Attribute { }
+
+    /// <summary>On a delegate type: it may change its captures, like Rust's FnMut.</summary>
+    public sealed class MutAttribute : Attribute { }
+
+    /// <summary>Marks suspended code, whose objects can hold borrows like a Rust future.</summary>
+    public sealed class BorrowHolderAttribute : Attribute { }
+
+    public sealed class ThreadStaticAttribute : Attribute { }
+
+    public delegate void Action();
+
+    [Mut] public delegate void Action<A>(A a);
+    [Mut] public delegate void Action<A, B>(A a, B b);
+    [Mut] public delegate R Func<R>();
+    [Mut] public delegate R Func<A, R>(A a);
+    [Mut] public delegate R Func<A, B, R>(A a, B b);
+
+    /// <summary>On a delegate type: it may borrow, and what it borrows must be usable from another thread.</summary>
+    public sealed class ScopedSendAttribute : Attribute { }
+
+    /// <summary>Rust's #[derive(PartialEq, Eq, Hash)]: the compiler compares and hashes the fields.</summary>
+    public sealed class EqAttribute : Attribute { }
+
+    /// <summary>Rust's PartialEq, written by hand.</summary>
+    public interface IEq<T> { readonly bool Eq(in T other); }
+}

@@ -1,0 +1,17 @@
+namespace System
+{
+    /// <summary>Rust's panic!, unreachable!, todo! and assert!. A panic ends the thread; it cannot be caught.</summary>
+    public static class Panic
+    {
+        // There is no `throw`: the compiler's Unwind starts the one kind of unwinding there is.
+        public static void Raise(string message) { Mem.Unwind(new PanicException(message)); }
+        public static void Unreachable() { Raise("internal error: entered unreachable code"); }
+        /// <summary>unreachable!() where a value is expected: it panics, so the value is never made.</summary>
+        public static T Unreachable<T>() { Unreachable(); return Unreachable<T>(); }
+        public static void Todo() { Raise("not yet implemented"); }
+        public static void Assert(bool condition, string message = "assertion failed")
+        {
+            if (!condition) Raise(message);
+        }
+    }
+}

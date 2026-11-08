@@ -1,0 +1,15 @@
+using System;
+class A { public int V; }
+class P
+{
+    static A? S = None;
+    static A? Take() => S.Take(); // error: CS9921
+    static void Main()
+    {
+        int[] a = new int[2];
+        ref int x = ref a[0];
+        ref int y = ref a[1]; // error: CS9911
+        x = 1;
+        y = 2;
+    }
+}

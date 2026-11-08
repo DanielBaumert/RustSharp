@@ -1,0 +1,87 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>A lazy future without a result. `await` drives it; dropping it cancels it.</summary>
+    [BorrowHolder]
+    public unsafe class Task
+    {
+        internal bool _done;
+        private Option<object> _owner = Option<object>.None;
+
+        internal Task() { }
+
+        /// <summary>Called by the compiler: the task takes over the closure that created it.</summary>
+        public void AdoptOwner(object owner)
+        {
+            _owner = Option<object>.Some(owner);
+        }
+
+        /// <summary>One step. True when finished; if false, a waker has been arranged.</summary>
+        internal virtual bool PollCore() => true;
+
+        /// <summary>Rust's poll. A panic inside unwinds through whoever polls, as in Rust.</summary>
+        public bool Poll()
+        {
+            if (_done) return true;
+            if (PollCore()) _done = true;
+            return _done;
+        }
+
+        public static Task FromCoroutine(void* frame, delegate*<void*, void*, int> resume, delegate*<void*, void> drop)
+            => new CoroutineTask(frame, resume, drop);
+
+        public static Task CompletedTask
+        {
+            get
+            {
+                var t = new Task();
+                t._done = true;
+                return t;
+            }
+        }
+        public static Task<T> FromResult<T>(T value) => new ReadyTask<T>(value);
+
+        /// <summary>Completes after a delay, without blocking a thread.</summary>
+        public static Task Delay(int milliseconds) => new DelayTask(milliseconds);
+
+        /// <summary>Gives other tasks a turn.</summary>
+        public static Task Yield() => new YieldTask();
+
+        /// <summary>Starts work on the runtime's workers: Rust's `tokio::spawn`.</summary>
+        public static JoinHandle<T> Run<T>('static AsyncWork<T> work)
+        {
+            Mem.RequireSend<T>();
+            var shared = new SharedResult<T>();
+            var job = Runtime.Start(new SpawnJob<T>(work, shared.Clone()));
+            return new JoinHandle<T>(shared, job);
+        }
+
+        /// <summary>Runs blocking code on its own thread, so it cannot stall a worker: `spawn_blocking`.</summary>
+        public static Task<Result<T, System.Threading.JoinError>> RunBlocking<T>('static System.Threading.ThreadWork<T> work)
+        {
+            Mem.RequireSend<T>();
+            var shared = new SharedResult<T>();
+            var packet = (BlockingPacket<T>*)Libc.calloc(1, Mem.SizeOf<BlockingPacket<T>>());
+            Mem.Write(Mem.AddressOf(in packet->Work), work);
+            Mem.Write(Mem.AddressOf(in packet->Shared), shared.Clone());
+            ulong id;
+            Pthread.pthread_create(&id, null, &BlockingPacket<T>.Entry, packet);
+            Pthread.pthread_detach(id);
+            return new JoinTask<T>(shared);
+        }
+
+        public static Task WhenAll(params Task[] tasks) => new AllTask(tasks);
+
+        /// <summary>Finishes with the first task and cancels the rest: `select!`. The result is its index.</summary>
+        public static Task<int> WhenAny(params Task[] tasks) => new AnyTask(tasks);
+
+        /// <summary>Like WhenAny for tasks of one type: the index of the winner and its result.</summary>
+        public static Task<(int, T)> Race<T>(params Task<T>[] tasks) => new RaceTask<T>(tasks);
+
+        /// <summary>Cancels the task when it takes too long and gives Err(Elapsed): `time::timeout`.</summary>
+        public static Task<Result<T, Elapsed>> Timeout<T>(Task<T> task, int milliseconds) => new TimeoutTask<T>(task, milliseconds);
+
+        public move TaskAwaiter GetAwaiter() => new TaskAwaiter(this);
+    }
+}

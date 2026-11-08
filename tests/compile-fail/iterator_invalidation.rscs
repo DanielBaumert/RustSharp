@@ -1,0 +1,36 @@
+using System.Collections.Generic;
+class C { public int V; }
+class Tree { public Tree? Left = None; public int V; }
+class P
+{
+    static void Main()
+    {
+        mut var list = new List<int>();
+        list.Add(1);
+        foreach (var x in list)
+            list.Add(x); // error: CS9909
+
+        ref int r = ref list[0];
+        list.Add(2); // error: CS9911
+        r = 1;
+
+        ref readonly int s = ref list.At(0);
+        list.Clear(); // error: CS9909
+        int use = s;
+
+        mut var owner = new C();
+        ref int v = ref owner.V;
+        owner = new C(); // error: CS9907
+        v = 1;
+
+        var moved = new List<int>();
+        mut var e = moved.GetEnumerator();
+        var gone = moved; // error: CS9906
+        e.MoveNext();
+
+        mut var t = new Tree();
+        ref Tree? l = ref t.Left;
+        t.Left = None; // error: CS9907
+        l = None;
+    }
+}

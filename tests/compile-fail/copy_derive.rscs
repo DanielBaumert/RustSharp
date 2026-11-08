@@ -1,0 +1,29 @@
+using System;
+using System.Collections.Generic;
+struct Plain { public int X; }
+[Copy] struct Point { public int X, Y; }
+[Copy] struct Bad { public List<int> Items; } // error: CS9922
+[Copy] class NotAValue { } // error: CS9922
+enum Light { On, Off }
+[Copy] enum Mode { A, B }
+class P
+{
+    static void Main()
+    {
+        var p = new Point { X = 1, Y = 2 };
+        var q = p;
+        Console.WriteLine(p.X + q.Y);
+
+        var plain = new Plain { X = 1 };
+        var moved = plain;
+        Console.WriteLine(plain.X); // error: CS9900
+
+        var l = Light.On;
+        var l2 = l;
+        Console.WriteLine(l); // error: CS9901
+
+        var m = Mode.A;
+        var m2 = m;
+        Console.WriteLine(m);
+    }
+}

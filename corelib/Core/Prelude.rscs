@@ -1,0 +1,19 @@
+global using static System.Option;
+
+namespace System
+{
+    /// <summary>Rust's prelude: `Some(v)` and `None` without naming the Option's type.</summary>
+    public static class Option
+    {
+        public static Option<T> Some<T>(T value) => Option<T>.Some(value);
+
+        /// <summary>A None that does not know its T yet: it converts to any Option&lt;T&gt;.</summary>
+        public static NoneValue None => default(NoneValue);
+    }
+
+    /// <summary>The type of the prelude's `None`. Use it as an Option&lt;T&gt;.</summary>
+    public readonly struct NoneValue
+    {
+        public override string ToString() => "None";
+    }
+}

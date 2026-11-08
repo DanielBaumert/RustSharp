@@ -1,0 +1,155 @@
+namespace System.Linq
+{
+    /// <summary>A lazy query. Consuming methods take it by value, like Rust's iterator adapters.</summary>
+    public unsafe ref partial struct Query<T, I> where I : IIter<T>, allows ref struct
+    {
+        private I _it;
+        internal Query(I it) { _it = it; }
+
+        public move Query<T, WhereIter<T, I>> Where(Predicate<T> keep)
+            => new Query<T, WhereIter<T, I>>(new WhereIter<T, I>(_it, keep));
+        public move Query<U, SelectIter<T, U, I>> Select<U>(Selector<T, U> map)
+            => new Query<U, SelectIter<T, U, I>>(new SelectIter<T, U, I>(_it, map));
+        public move Query<T, TakeIter<T, I>> Take(int n)
+            => new Query<T, TakeIter<T, I>>(new TakeIter<T, I>(_it, n));
+        public move Query<T, SkipIter<T, I>> Skip(int n)
+            => new Query<T, SkipIter<T, I>>(new SkipIter<T, I>(_it, n));
+
+        public move Query<T, WhileIter<T, I>> TakeWhile(Predicate<T> test)
+            => new Query<T, WhileIter<T, I>>(new WhileIter<T, I>(_it, test, true));
+        public move Query<T, WhileIter<T, I>> SkipWhile(Predicate<T> test)
+            => new Query<T, WhileIter<T, I>>(new WhileIter<T, I>(_it, test, false));
+        public move Query<T, ConcatIter<T, I, J>> Concat<J>(Query<T, J> other) where J : IIter<T>, allows ref struct
+            => new Query<T, ConcatIter<T, I, J>>(new ConcatIter<T, I, J>(_it, other.Inner()));
+        public move Query<(T, B), ZipIter<T, B, I, J>> Zip<B, J>(Query<B, J> other) where J : IIter<B>, allows ref struct
+            => new Query<(T, B), ZipIter<T, B, I, J>>(new ZipIter<T, B, I, J>(_it, other.Inner()));
+
+        internal move I Inner() => _it;
+
+        private static Query<T, OwnedIter<T>> Owned(System.Collections.Generic.List<T> list)
+            => new Query<T, OwnedIter<T>>(new OwnedIter<T>(list));
+
+        /// <summary>Sorted by the elements' natural order. Elements are cloned, the source stays as it is.</summary>
+        public move Query<T, OwnedIter<T>> Order()
+        {
+            var list = ToListInternal();
+            list.Sort();
+            return Owned(list);
+        }
+
+        public move Query<T, OwnedIter<T>> OrderBy<K>(Selector<T, K> key)
+        {
+            var list = ToListInternal();
+            // The keys first: if a key selector panics, nothing has been moved yet.
+            var keys = new System.Collections.Generic.List<K>();
+            for (int i = 0; i < list.Count; i++) keys.Add(key(in list[i]));
+            var keyed = new System.Collections.Generic.List<Keyed<K, T>>();
+            for (int i = 0; i < list.Count; i++) keyed.Add(new Keyed<K, T> { Key = keys.ReadOut(i), Item = list.ReadOut(i) });
+            keys.ForgetAll();
+            list.ForgetAll();
+            keyed.Sort();
+            var result = new System.Collections.Generic.List<T>();
+            for (int i = 0; i < keyed.Count; i++)
+            {
+                var e = keyed.ReadOut(i);
+                result.Add(e.Item);
+            }
+            keyed.ForgetAll();
+            return Owned(result);
+        }
+
+        public move Query<T, OwnedIter<T>> OrderByDescending<K>(Selector<T, K> key)
+        {
+            var q = OrderBy(key);
+            var list = q.ToList();
+            list.Reverse();
+            return Owned(list);
+        }
+
+        public move Query<T, OwnedIter<T>> Reverse()
+        {
+            var list = ToListInternal();
+            list.Reverse();
+            return Owned(list);
+        }
+
+        public move Query<T, OwnedIter<T>> Distinct()
+        {
+            var seen = new System.Collections.Generic.HashSet<T>();
+            var result = new System.Collections.Generic.List<T>();
+            while (true)
+            {
+                T* item = _it.Next();
+                if (item == null) return Owned(result);
+                if (seen.Add(Mem.CloneOf(in *item))) result.Add(Mem.CloneOf(in *item));
+            }
+        }
+
+        public move System.Collections.Generic.Dictionary<K, System.Collections.Generic.List<T>> GroupBy<K>(Selector<T, K> key)
+        {
+            var groups = new System.Collections.Generic.Dictionary<K, System.Collections.Generic.List<T>>();
+            while (true)
+            {
+                T* item = _it.Next();
+                if (item == null) return groups;
+                K k = key(in *item);
+                if (!groups.ContainsKey(in k)) groups.Set(Mem.CloneOf(in k), new System.Collections.Generic.List<T>());
+                groups[in k].Add(Mem.CloneOf(in *item));
+            }
+        }
+
+        public move System.Collections.Generic.Dictionary<K, T> ToDictionary<K>(Selector<T, K> key)
+        {
+            var map = new System.Collections.Generic.Dictionary<K, T>();
+            while (true)
+            {
+                T* item = _it.Next();
+                if (item == null) return map;
+                map.Set(key(in *item), Mem.CloneOf(in *item));
+            }
+        }
+
+        public move System.Collections.Generic.HashSet<T> ToHashSet()
+        {
+            var set = new System.Collections.Generic.HashSet<T>();
+            while (true)
+            {
+                T* item = _it.Next();
+                if (item == null) return set;
+                set.Add(Mem.CloneOf(in *item));
+            }
+        }
+
+        public move bool Contains(in T value)
+        {
+            while (true)
+            {
+                T* item = _it.Next();
+                if (item == null) return false;
+                if (Mem.EqualOf(in *item, in value)) return true;
+            }
+        }
+
+        public move int Count(Predicate<T> test)
+        {
+            int n = 0;
+            while (true)
+            {
+                T* item = _it.Next();
+                if (item == null) return n;
+                if (test(in *item)) n++;
+            }
+        }
+
+        /// <summary>Rust's find: None when nothing matches.</summary>
+        public move Option<T> First(Predicate<T> test)
+        {
+            while (true)
+            {
+                T* item = _it.Next();
+                if (item == null) return Option<T>.None;
+                if (test(in *item)) return Option<T>.Some(Mem.CloneOf(in *item));
+            }
+        }
+    }
+}

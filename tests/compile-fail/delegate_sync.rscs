@@ -1,0 +1,13 @@
+using System;
+using System.Threading;
+[Send] delegate int Shared();
+class P
+{
+    static int Zero() => 0;
+    static void Main()
+    {
+        Shared f = Zero;
+        var a = new Arc<Shared>(f);
+        var t = Thread.Run(move () => a.Value()); // error: CS9923
+    }
+}

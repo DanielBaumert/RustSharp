@@ -1,0 +1,45 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    /// <summary>Owns its data and hands it out only while locked: Rust's Mutex, not a lock next to the data.</summary>
+    [SendWhen(Bound.Send), SyncWhen(Bound.Send)]
+    public unsafe class Mutex<T>
+    {
+        private void* _lock;
+        private T _value;
+
+        public Mutex(T value)
+        {
+            _lock = Libc.malloc(64);
+            Pthread.pthread_mutex_init(_lock, null);
+            _value = value;
+        }
+
+        ~Mutex()
+        {
+            Pthread.pthread_mutex_destroy(_lock);
+            Libc.free(_lock);
+        }
+
+        internal readonly ref T Unguarded() => ref *Mem.AddressOf(in _value);
+
+        /// <summary>The guard unlocks when it goes out of scope. Only through it can the data be reached.</summary>
+        public readonly Guard Lock()
+        {
+            Pthread.pthread_mutex_lock(_lock);
+            return new Guard(_lock, Mem.AddressOf(in _value));
+        }
+
+        [MustNotSuspend]
+        public ref struct Guard
+        {
+            private void* _lock;
+            private T* _value;
+            internal Guard(void* l, T* value) { _lock = l; _value = value; }
+            public ref T Value => ref *_value;
+            internal readonly void* RawLock => _lock;
+            ~Guard() { Pthread.pthread_mutex_unlock(_lock); }
+        }
+    }
+}

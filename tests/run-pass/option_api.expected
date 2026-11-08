@@ -1,0 +1,32 @@
+True False
+True False
+5
+Some(6)
+12
+9
+1 2 0 4
+Some(20) None
+3 0
+6 -1
+Some(7) 7
+Ok(1) Err(missing)
+Err(computed)
+Some(4) None
+Some(b) None
+Some(2) None
+Some(9) Some(10)
+Some(1) None Some(3)
+a True
+Some(5) Some(five)
+None Some(1)
+1 Some(1)
+None Some(7)
+Some(7) None
+11
+Some(11) None
+Ok(Some(1))
+Ok(None)
+Err(e)
+Some(3) None
+21
+21

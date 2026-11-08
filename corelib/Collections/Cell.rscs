@@ -1,0 +1,12 @@
+namespace System
+{
+    /// <summary>A Copy value that can change behind a shared reference. One thread only.</summary>
+    [SendWhen(Bound.Send), SyncWhen(Bound.Never)]
+    public unsafe struct Cell<T> where T : unmanaged
+    {
+        private T _value;
+        public Cell(T value) { _value = value; }
+        public readonly T Get() => _value;
+        public readonly void Set(T value) { *Mem.AddressOf(in _value) = value; }
+    }
+}

@@ -1,0 +1,15 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace System.IO
+{
+    /// <summary>Rust's io::Error: I/O fails with a value, never with an exception.</summary>
+    public sealed class IoError
+    {
+        private string _message;
+        public IoError(string message) { _message = message; }
+        public readonly string Message => _message.Clone();
+        public override readonly string ToString() => _message.Clone();
+    }
+}

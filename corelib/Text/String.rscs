@@ -1,0 +1,117 @@
+namespace System
+{
+    /// <summary>
+    /// Rust's String: UTF-8 bytes, owned and moved. The bytes live in a buffer with its own count, so a
+    /// shared read inside the corelib copies only the handle; changing a string copies a shared buffer
+    /// first (copy-on-write). Literals point at static bytes; their template handle has _rc = -1.
+    /// </summary>
+    public sealed unsafe partial class String
+    {
+        private int _rc;
+        private int _length;
+        private byte* _data;
+        private int _capacity;
+
+        /// <summary>The length in bytes, like Rust's len().</summary>
+        public readonly int Length => _length;
+        public readonly bool IsEmpty => _length == 0;
+
+        internal readonly byte* Bytes0 => _data;
+
+        /// <summary>Rust's as_ptr(): the UTF-8 bytes. Valid while the string lives and does not change.</summary>
+        public readonly byte* AsPtr() => _data;
+        internal readonly byte ByteAt(int i)
+        {
+            if ((uint)i >= (uint)_length) Panic.Raise("byte index " + i.ToString() + " is out of bounds of the string");
+            return _data[i];
+        }
+
+        internal readonly void SetByte(int i, byte b) { _data[i] = b; }
+
+        private static byte* NewBuffer(int capacity)
+        {
+            byte* p = (byte*)Libc.malloc(8 + (long)capacity + 1);
+            *(long*)p = 1;
+            return p + 8;
+        }
+
+        /// <summary>A new string of `length` bytes, all zero, that the caller fills.</summary>
+        internal static string Allocate(int length)
+        {
+            byte* o = (byte*)Libc.calloc(1, 32);
+            *(long*)o = 1;
+            *(int*)(o + 8) = 1;
+            *(int*)(o + 12) = length;
+            byte* data = NewBuffer(length);
+            for (int i = 0; i <= length; i++) data[i] = 0;
+            *(byte**)(o + 16) = data;
+            *(int*)(o + 24) = length;
+            return Mem.Transmute<long, string>((long)o);
+        }
+
+        /// <summary>A string is never null; this is IsEmpty under its C# name.</summary>
+        public static bool IsNullOrEmpty(in string s) => s.Length == 0;
+
+        /// <summary>Copies UTF-8 bytes; invalid input is the caller's responsibility, as with from_utf8_unchecked.</summary>
+        public static string FromUtf8(byte* p, int n)
+        {
+            string s = Allocate(n);
+            Libc.memcpy(s._data, p, n);
+            return s;
+        }
+
+        /// <summary>A malloc'd copy with a terminating zero, for C; the caller frees it.</summary>
+        internal readonly byte* ToUtf8(out int length)
+        {
+            byte* buf = (byte*)Libc.malloc((long)_length + 1);
+            Libc.memcpy(buf, _data, _length);
+            buf[_length] = 0;
+            length = _length;
+            return buf;
+        }
+
+        private static int Len(in string s) => s.Length;
+
+        private static void CopyInto(string dest, int offset, in string src)
+        {
+            Libc.memcpy(dest._data + offset, src._data, src._length);
+        }
+
+        public static string Concat(string a, string b)
+        {
+            string r = Allocate(Len(in a) + Len(in b));
+            CopyInto(r, 0, in a);
+            CopyInto(r, Len(in a), in b);
+            return r;
+        }
+
+        public static string Concat(string a, string b, string c) => Concat(Concat(a, b), c);
+        public static string Concat(string a, string b, string c, string d) => Concat(Concat(a, b), Concat(c, d));
+
+        public static string Concat(params string[] parts)
+        {
+            int n = 0;
+            for (int i = 0; i < parts.Length; i++) n += Len(in parts[i]);
+            string r = Allocate(n);
+            int o = 0;
+            for (int i = 0; i < parts.Length; i++)
+            {
+                CopyInto(r, o, in parts[i]);
+                o += Len(in parts[i]);
+            }
+            return r;
+        }
+
+        public static bool operator ==(string a, string b) => Equals(a, b);
+        public static bool operator !=(string a, string b) => !Equals(a, b);
+
+        public static bool Equals(string a, string b)
+        {
+            if (a == (object)null || b == (object)null) return a == (object)null && b == (object)null;
+            if (a._length != b._length) return false;
+            return Libc.memcmp(a._data, b._data, a._length) == 0;
+        }
+
+        public override readonly bool Equals(object other) => false;
+    }
+}

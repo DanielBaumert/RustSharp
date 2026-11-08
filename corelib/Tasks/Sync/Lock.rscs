@@ -1,0 +1,38 @@
+using System.Collections.Generic;
+using System.Threading;
+
+namespace System.Threading
+{
+    /// <summary>The lock of the C# `lock` statement. It guards no data; prefer Mutex&lt;T&gt;.</summary>
+    [SendWhen(Bound.Always), SyncWhen(Bound.Always)]
+    public sealed unsafe class Lock
+    {
+        private void* _lock;
+        public Lock()
+        {
+            _lock = Libc.malloc(64);
+            Pthread.pthread_mutex_init(_lock, null);
+        }
+        ~Lock()
+        {
+            Pthread.pthread_mutex_destroy(_lock);
+            Libc.free(_lock);
+        }
+        public readonly void Enter() { Pthread.pthread_mutex_lock(_lock); }
+        public readonly void Exit() { Pthread.pthread_mutex_unlock(_lock); }
+        public readonly bool TryEnter() => false;
+        public readonly bool IsHeldByCurrentThread => false;
+        public readonly Scope EnterScope()
+        {
+            Pthread.pthread_mutex_lock(_lock);
+            return new Scope(_lock);
+        }
+        [MustNotSuspend]
+        public ref struct Scope
+        {
+            private void* _lock;
+            internal Scope(void* l) { _lock = l; }
+            public void Dispose() { if (_lock != null) { Pthread.pthread_mutex_unlock(_lock); _lock = null; } }
+        }
+    }
+}

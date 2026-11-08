@@ -1,0 +1,17 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    [BorrowHolder]
+    public struct TaskAwaiter : INotifyCompletion
+    {
+        private Option<Task> _task; // taken when GetResult has to block on it
+        internal TaskAwaiter(Task task) { _task = Option<Task>.Some(task); }
+        public unsafe readonly bool IsCompleted => Mem.AsRef(Mem.AddressOf(in _task.Slot)).Poll();
+        public void GetResult()
+        {
+            if (!_task.Slot._done) Runtime.BlockOn(_task.Take().Unwrap());
+        }
+        public void OnCompleted(Action continuation) { }
+    }
+}

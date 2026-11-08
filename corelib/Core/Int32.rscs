@@ -1,0 +1,16 @@
+namespace System
+{
+    public readonly partial struct Int32
+    {
+        public const int MaxValue = 2147483647;
+        public const int MinValue = -2147483648;
+        public override string ToString() => Number.Format((long)this);
+        public override int GetHashCode() => this;
+        /// <summary>Rust's str::parse: an error is a value, not an exception.</summary>
+        public static Result<int, ParseError> Parse(string s)
+        {
+            if (!Number.TryParse(s, out long v) || v > MaxValue || v < MinValue) return Result<int, ParseError>.Err(new ParseError("invalid digit found in string"));
+            return Result<int, ParseError>.Ok((int)v);
+        }
+    }
+}

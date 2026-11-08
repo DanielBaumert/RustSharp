@@ -1,0 +1,16 @@
+interface IRead { readonly int Get(); }
+interface IMut { void Set(); }
+class A : IRead { int _n; public int Get() { _n++; return _n; } } // error: CS9920
+class B : IRead { int _n; public readonly int Get() => _n; }
+class C : IMut { public readonly void Set() { } }
+class D : IMut { public move void Set() { } } // error: CS9920
+interface ITrait
+{
+    void Use() { }
+    move void Eat() { }
+    readonly void Look() { }
+}
+class X : ITrait { public move void Use() { } } // error: CS9920
+class Y : ITrait { public void Eat() { } } // error: CS9920
+class Z : ITrait { public readonly void Use() { } public move void Eat() { } public readonly void Look() { } }
+class P { static void Main() { } }

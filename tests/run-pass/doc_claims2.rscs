@@ -1,0 +1,38 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+class Table { public static readonly int[] Primes = new int[] { 2, 3, 5 }; }
+record R(int X);
+class P
+{
+    static async Task<int> Add(int a, int b)
+    {
+        await Task.Delay(1);
+        return a + b;
+    }
+    static void Main()
+    {
+        var cell = new RefCell<int>(1);
+        {
+            mut var w = cell.BorrowMut();
+            w.Value = 5;
+            Console.WriteLine(cell.CanBorrowMut ? "free" : "already borrowed");
+        }
+        Console.WriteLine(cell.Borrow().Value);
+
+        Console.WriteLine(Table.Primes[2] + Table.Primes.Length);
+
+        var total = new AtomicLong(5);
+        Console.WriteLine(total.Add(3));
+
+        var handle = Task.Run(move () => Add(1, 2));
+        Console.WriteLine(Runtime.BlockOn(handle).Unwrap());
+
+        var r = new R(1);
+        var s = r.Clone();
+        Console.WriteLine(r.Equals(s));
+        Console.WriteLine(r.X + s.X);
+    }
+}

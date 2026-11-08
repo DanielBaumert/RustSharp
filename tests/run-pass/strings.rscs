@@ -1,0 +1,32 @@
+using System;
+using System.Text;
+class P
+{
+    // Rust: fn twice(s: &str) -> String
+    static string Twice(in string s) => s + s;
+    static void Main()
+    {
+        string a = "hello";
+        string b = a.Clone();
+        Console.WriteLine(a + " " + b);
+        Console.WriteLine(Twice(in a).Length);
+        Console.WriteLine(a.Substring(1, 3));
+        Console.WriteLine(a.IndexOf('l'));
+        Console.WriteLine(a == "hello");
+        Console.WriteLine(a != b);
+        int x = 7;
+        double d = 2.5;
+        Console.WriteLine($"x={x} d={d} s={a}!");
+        mut var sb = new StringBuilder();
+        for (mut int i = 0; i < 3; i++) sb.Append(i.ToString());
+        sb.Append('!');
+        Console.WriteLine(sb.ToString());
+        Console.WriteLine("grüße €");
+        Console.WriteLine('c');
+        Console.WriteLine(-123456789012L);
+        Console.WriteLine(int.Parse("-42").Unwrap() + 1);
+        // Rust has no s[i]: a string is UTF-8 bytes. s.chars().nth(1) is:
+        var c = a.Chars().Skip(1).First().Unwrap();
+        Console.WriteLine(c);
+    }
+}

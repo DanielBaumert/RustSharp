@@ -1,0 +1,40 @@
+using System;
+class P
+{
+    static void Main()
+    {
+        decimal a = 1.10m, b = 2.2m;
+        Console.WriteLine(a + b);
+        Console.WriteLine(a * b);
+        Console.WriteLine(1m / 3m);
+        Console.WriteLine(2m / 3m);
+        Console.WriteLine(1.00m / 2m);
+        Console.WriteLine(10m / 4m);
+        Console.WriteLine(7.5m % 2m);
+        Console.WriteLine(-a);
+        Console.WriteLine(a < b);
+        Console.WriteLine(1.0m == 1.00m);
+        Console.WriteLine(decimal.MaxValue);
+        Console.WriteLine(decimal.MinValue);
+        Console.WriteLine((int)3.99m);
+        Console.WriteLine((long)-3.99m);
+        Console.WriteLine((double)0.5m);
+        Console.WriteLine((decimal)0.1);
+        Console.WriteLine((decimal)1.5f);
+        mut decimal fromInt = 5;
+        fromInt++;
+        Console.WriteLine(fromInt);
+        decimal price = 19.99m;
+        int quantity = 3;
+        Console.WriteLine($"total={price * quantity}");
+        decimal[] values = { 1.5m, 2.5m };
+        mut decimal sum = 0;
+        foreach (var v in values) sum += v;
+        Console.WriteLine(sum);
+        decimal max = decimal.MaxValue;
+        Console.WriteLine(decimal.CheckedAdd(max, 1m).IsNone ? "overflow" : "?");
+        Console.WriteLine(decimal.CheckedDiv(1m, sum - 4m).IsNone ? "div0" : "?");
+        Console.WriteLine(decimal.CheckedToInt64(max).IsNone ? "too big" : "?");
+        Console.WriteLine(decimal.Parse("12.50").Unwrap() + decimal.Parse("x").UnwrapOr(1m));
+    }
+}

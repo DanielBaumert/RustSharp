@@ -1,0 +1,14 @@
+namespace System.Collections.Generic
+{
+    [SendWhen(Bound.Send), SyncWhen(Bound.Sync)]
+    [CarriesBorrows]
+    public class Stack<T>
+    {
+        private List<T> _items = new List<T>();
+        public readonly int Count => _items.Count;
+        public void Push(T item) { _items.Add(item); }
+        /// <summary>None when the stack is empty.</summary>
+        public Option<T> Pop() => _items.RemoveLast();
+        public readonly ref readonly T Peek() => ref _items.At(_items.Count - 1);
+    }
+}

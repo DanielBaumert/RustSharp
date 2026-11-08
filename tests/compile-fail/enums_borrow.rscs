@@ -1,0 +1,23 @@
+using System;
+enum Tree
+{
+    Leaf(int V),
+    Node(Tree Left, Tree Right),
+}
+class P
+{
+    // Rust: `if let Node(l, _) = t { return *l; }` with t: &Tree cannot move l out of the borrow.
+    static Tree Steal(in Tree t)
+    {
+        if (t is Tree.Node(var l, _)) return l; // error: CS9902
+        return new Tree.Leaf(0);
+    }
+
+    static int Fine(in Tree t) => t switch
+    {
+        Tree.Leaf(var v) => v,
+        Tree.Node(var l, var r) => Fine(in l) + Fine(in r),
+    };
+
+    static void Main() { }
+}

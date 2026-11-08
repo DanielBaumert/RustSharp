@@ -1,0 +1,25 @@
+using System;
+class C { public int V = 2; ~C() { Console.WriteLine("drop c"); } }
+class P
+{
+    static int Get<T>(T value) { var a = new { Item = value, N = 3 }; return a.N; }
+    static void Main()
+    {
+        var r = new { A = 1, B = "text", D = 2.5 };
+        Console.WriteLine(r.A);
+        Console.WriteLine(r.B);
+        Console.WriteLine(r.B);
+        Console.WriteLine(r);
+        var n = new { Inner = new { X = 4 }, Name = "n" };
+        Console.WriteLine(n.Inner.X);
+        Console.WriteLine(n);
+        var items = new[] { new { K = 1 }, new { K = 2 } };
+        Console.WriteLine(items[1].K);
+        Console.WriteLine(Get("x") + Get(1));
+        var owner = new { Obj = new C(), Tag = 1 };
+        Console.WriteLine(owner.Obj.V);
+        var moved = owner.Obj;
+        Console.WriteLine(owner.Tag);
+        Console.WriteLine("end");
+    }
+}

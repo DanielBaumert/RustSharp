@@ -1,0 +1,20 @@
+using System;
+delegate void Plain();
+[Mut] delegate void Changing();
+class Counter { public int N; public void Bump() { N++; } public readonly int Get() => N; }
+class P
+{
+    static void CallShared(in Changing f) { f(); } // error: CS9918
+    static void CallMut(ref Changing f) { f(); }
+    static void CallOwned(mut Changing f) { f(); }
+    static void Main()
+    {
+        mut int a = 0;
+        Plain p = () => { a++; }; // error: CS9927
+        mut Changing ok = () => { a++; };
+        ok();
+
+        var c = new Counter();
+        Plain m = c.Bump; // error: CS9927
+    }
+}

@@ -1,0 +1,95 @@
+using System;
+using System.Collections.Generic;
+
+enum Shape
+{
+    Circle(double R),
+    Rect(double W, double H),
+    Empty;
+
+    // Methods after the variants, like Rust's impl block.
+    public readonly double Area() => this switch
+    {
+        Circle(var r) => 3 * r * r,
+        Rect(var w, var h) => w * h,
+        Empty => 0,
+    };
+}
+
+enum Expr
+{
+    Num(int Value),
+    Add(Expr Left, Expr Right),
+    Neg(Expr Inner);
+
+    public readonly int Eval() => this switch
+    {
+        Num(var v) => v,
+        Add(var l, var r) => l.Eval() + r.Eval(),
+        Neg(var e) => -e.Eval(),
+    };
+}
+
+enum Message
+{
+    Quit,
+    Move(int X, int Y),
+    Write(string Text),
+}
+
+class Res { string _n; public Res(string n) { _n = n; } ~Res() { Console.WriteLine("drop " + _n); } }
+
+enum Owner
+{
+    Holds(Res Value),
+    Nothing,
+}
+
+class P
+{
+    static string Describe(Message m)
+    {
+        switch (m)
+        {
+            case Message.Quit:
+                return "quit";
+            case Message.Move(var x, var y) when x == 0 && y == 0:
+                return "stay";
+            case Message.Move(var x, var y):
+                return "move " + x.ToString() + "," + y.ToString();
+            case Message.Write(var text):
+                return "write " + text;
+        }
+        return "unreachable";
+    }
+
+    static void Main()
+    {
+        mut var shapes = new List<Shape>();
+        shapes.Add(new Shape.Circle(2));
+        shapes.Add(new Shape.Rect(2, 3));
+        shapes.Add(new Shape.Empty());
+        foreach (ref readonly var s in shapes) Console.WriteLine(s + " " + s.Area().ToString());
+
+        var e = new Expr.Add(new Expr.Num(2), new Expr.Neg(new Expr.Num(5)));
+        Console.WriteLine(e.Eval());
+
+        Console.WriteLine(Describe(new Message.Move(0, 0)));
+        Console.WriteLine(Describe(new Message.Move(1, 2)));
+        Console.WriteLine(Describe(new Message.Write("hi")));
+        Console.WriteLine(Describe(new Message.Quit()));
+
+        // An or-pattern covers two variants at once; `is` works as Rust's `if let`.
+        Shape any = new Shape.Rect(1, 1);
+        Console.WriteLine(any switch { Shape.Circle or Shape.Rect => "has area", Shape.Empty => "empty" });
+        if (any is Shape.Rect(var w, _)) Console.WriteLine(w);
+
+        // Variants own their data and drop it, like Rust.
+        {
+            var owned = new Owner.Holds(new Res("inside"));
+            Console.WriteLine(owned is Owner.Holds);
+        }
+        Console.WriteLine(new Shape.Rect(1, 2) == new Shape.Rect(1, 2));
+        Console.WriteLine("end");
+    }
+}

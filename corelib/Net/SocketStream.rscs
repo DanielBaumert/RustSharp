@@ -1,0 +1,68 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    /// <summary>What TCP and Unix streams have in common.</summary>
+    public class SocketStream
+    {
+        internal Arc<SocketHandle> _socket;
+        private byte[] _line = new byte[4096];
+        private int _start, _end;
+
+        internal SocketStream(int fd) { _socket = new Arc<SocketHandle>(new SocketHandle(fd)); }
+
+        /// <summary>Reads what is available. The buffer stays borrowed until the task is done; 0 means end of stream.</summary>
+        public unsafe readonly 'a Task<Result<int, IoError>> ReadAsync(ref 'a byte[] buffer)
+            => new ReadTask(_socket.Clone(), buffer.Length == 0 ? null : Mem.AddressOf(in buffer[0]), buffer.Length);
+
+        /// <summary>Writes the first <paramref name="count"/> bytes completely.</summary>
+        public unsafe readonly 'a Task<Result<int, IoError>> WriteAsync(in 'a byte[] buffer, int count)
+        {
+            if (count < 0 || count > buffer.Length) Panic.Raise("count is out of range for the buffer");
+            return new WriteTask(_socket.Clone(), count == 0 ? null : Mem.AddressOf(in buffer[0]), count, false);
+        }
+
+        public unsafe readonly Task<Result<int, IoError>> WriteAsync(string text)
+        {
+            int n;
+            byte* data = text.ToUtf8(out n);
+            return new WriteTask(_socket.Clone(), data, n, true);
+        }
+
+        /// <summary>Tokio's next_line: Ok(Some(line)) without the line feed, Ok(None) at the end of the stream.</summary>
+        public async Task<Result<Option<string>, IoError>> ReadLineAsync()
+        {
+            var text = new System.Text.StringBuilder();
+            bool any = false;
+            while (true)
+            {
+                while (_start < _end)
+                {
+                    byte b = _line[_start++];
+                    any = true;
+                    if (b == 10)
+                    {
+                        string line = text.ToString();
+                        if (line.Length > 0 && line.ByteAt(line.Length - 1) == '\r') return Result<Option<string>, IoError>.Ok(Option<string>.Some(line.Substring(0, line.Length - 1)));
+                        return Result<Option<string>, IoError>.Ok(Option<string>.Some(line));
+                    }
+                    text.AppendByte(b);
+                }
+                byte[] buffer = Mem.Replace(ref _line, new byte[0]); // the read borrows the buffer and the stream separately
+                var read = await ReadAsync(ref buffer);
+                _line = buffer;
+                int n = read?;
+                if (n == 0) return Result<Option<string>, IoError>.Ok(any ? Option<string>.Some(text.ToString()) : Option<string>.None);
+                _start = 0;
+                _end = n;
+            }
+        }
+
+        /// <summary>Tells the peer that nothing more will be written.</summary>
+        public readonly void ShutdownWrite() { Sys.shutdown(_socket.Value.Fd, 1); }
+    }
+}

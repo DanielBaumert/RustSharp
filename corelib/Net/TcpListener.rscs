@@ -1,0 +1,35 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    public sealed unsafe class TcpListener
+    {
+        private Arc<SocketHandle> _socket;
+        private TcpListener(int fd) { _socket = new Arc<SocketHandle>(new SocketHandle(fd)); }
+
+        /// <summary>Port 0 picks a free port; see LocalPort. IPv6 works too: "::1".</summary>
+        public static Result<TcpListener, IoError> Bind(string host, int port)
+        {
+            Sockaddr a = default;
+            if (!Address.TryParse(host, port, &a)) return Result<TcpListener, IoError>.Err(new IoError("invalid address " + host));
+            return Result<TcpListener, IoError>.Ok(new TcpListener(Listeners.Open(&a)?));
+        }
+
+        public readonly int LocalPort
+        {
+            get
+            {
+                Sockaddr a = default;
+                uint len = 112;
+                Sys.getsockname(_socket.Value.Fd, &a, &len);
+                return Address.Port(&a);
+            }
+        }
+
+        public readonly Task<Result<TcpStream, IoError>> AcceptAsync() => new AcceptTask<TcpStream>(_socket.Clone(), &TcpStream.Make);
+    }
+}

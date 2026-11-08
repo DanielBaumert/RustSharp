@@ -1,0 +1,19 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    /// <summary>Why a thread or task has no result: it panicked, or it was cancelled.</summary>
+    public sealed class JoinError
+    {
+        private string _message;
+        private bool _cancelled;
+        internal JoinError(string message, bool cancelled) { _message = message; _cancelled = cancelled; }
+
+        internal static JoinError From(Exception e) => new JoinError(e.Message, e is System.Threading.Tasks.Cancelled);
+
+        public readonly bool IsPanic => !_cancelled;
+        public readonly bool IsCancelled => _cancelled;
+        public readonly string Message => _message.Clone();
+        public override readonly string ToString() => _cancelled ? "task was cancelled" : "task panicked with message \"" + _message + "\"";
+    }
+}

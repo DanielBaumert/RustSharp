@@ -1,0 +1,16 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    /// <summary>The work of a thread. [Send]: everything it captures may move to that thread.</summary>
+    [Send, Once] public delegate T ThreadWork<T>();
+    [Send, Once] public delegate void ThreadAction();
+
+    internal unsafe struct ThreadPacket<T>
+    {
+        // calloc'd: zeroed memory is None
+        public Option<ThreadWork<T>> Work;
+        public Option<T> Result;
+        public Option<Exception> Error;
+    }
+}

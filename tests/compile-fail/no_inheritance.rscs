@@ -1,0 +1,9 @@
+interface IShape { readonly double Area(); }
+class Base { }
+class Derived : Base { } // error: CS9934
+record Animal(string Name);
+record Dog(string Name) : Animal(Name); // error: CS9934
+class Circle : IShape { public readonly double Area() => 3; }
+enum Shape { Dot(int X), Line(int A, int B) }
+class Text { public override readonly string ToString() => "text"; }
+class P { static void Main() { } }

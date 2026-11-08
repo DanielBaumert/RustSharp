@@ -1,0 +1,50 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    internal sealed unsafe class WriteTask : IoTask<int>
+    {
+        private Arc<SocketHandle> _socket;
+        private byte* _p;
+        private int _n;
+        private int _done;
+        private byte* _owned;
+        public WriteTask(Arc<SocketHandle> socket, byte* p, int n, bool owned)
+        {
+            _socket = socket;
+            _p = p;
+            _n = n;
+            if (owned) _owned = p;
+        }
+
+        ~WriteTask() { Libc.free(_owned); }
+
+        internal override bool PollCore()
+        {
+            if (!TaskRuntime.ConsumeBudget()) return false;
+            int fd = _socket.Value.Fd;
+            while (_done < _n)
+            {
+                long r = Sys.send(fd, _p + _done, _n - _done, 0x4000); // MSG_NOSIGNAL
+                if (r >= 0)
+                {
+                    _done += (int)r;
+                    continue;
+                }
+                int e = Sys.Errno;
+                if (e == Sys.EINTR) continue;
+                if (e == Sys.EAGAIN)
+                {
+                    if (Reactor.Wait(fd, true)) return false;
+                    continue;
+                }
+                return Fail(Address.ErrorText("write"));
+            }
+            return Done(_done);
+        }
+    }
+}

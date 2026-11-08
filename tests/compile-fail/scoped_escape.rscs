@@ -1,0 +1,13 @@
+using System;
+using System.Threading;
+class P
+{
+    static void Main()
+    {
+        mut var scope = new ThreadScope();
+        {
+            mut int inner = 0;
+            scope.Run(() => { inner = 1; }); // error: CS9925
+        }
+    }
+}

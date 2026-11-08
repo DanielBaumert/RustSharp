@@ -1,0 +1,19 @@
+namespace System
+{
+    public static class Math
+    {
+        [System.Runtime.InteropServices.DllImport("m")] public static extern double sqrt(double x);
+        [System.Runtime.InteropServices.DllImport("m")] public static extern double pow(double x, double y);
+        [System.Runtime.InteropServices.DllImport("m")] public static extern double sin(double x);
+        [System.Runtime.InteropServices.DllImport("m")] public static extern double cos(double x);
+        [System.Runtime.InteropServices.DllImport("m")] public static extern double floor(double x);
+        public static double Sqrt(double x) => sqrt(x);
+        public static double Pow(double x, double y) => pow(x, y);
+        public static double Sin(double x) => sin(x);
+        public static double Cos(double x) => cos(x);
+        public static double Floor(double x) => floor(x);
+        public static int Abs(int x) => x < 0 ? -x : x;
+        public static int Min(int a, int b) => a < b ? a : b;
+        public static int Max(int a, int b) => a > b ? a : b;
+    }
+}

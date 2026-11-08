@@ -1,0 +1,29 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    internal static unsafe class Pthread
+    {
+        [DllImport("c")] public static extern int pthread_create(ulong* thread, void* attr, delegate*<void*, void*> start, void* arg);
+        [DllImport("c")] public static extern ulong pthread_self();
+        [DllImport("c")] public static extern int pthread_join(ulong thread, void** result);
+        [DllImport("c")] public static extern int pthread_detach(ulong thread);
+        [DllImport("c")] public static extern int pthread_mutex_init(void* m, void* attr);
+        [DllImport("c")] public static extern int pthread_mutex_destroy(void* m);
+        [DllImport("c")] public static extern int pthread_mutex_lock(void* m);
+        [DllImport("c")] public static extern int pthread_mutex_unlock(void* m);
+        [DllImport("c")] public static extern int pthread_cond_init(void* c, void* attr);
+        [DllImport("c")] public static extern int pthread_cond_destroy(void* c);
+        [DllImport("c")] public static extern int pthread_cond_wait(void* c, void* m);
+        [DllImport("c")] public static extern int pthread_cond_signal(void* c);
+        [DllImport("c")] public static extern int pthread_cond_broadcast(void* c);
+        [DllImport("c")] public static extern int pthread_rwlock_init(void* l, void* attr);
+        [DllImport("c")] public static extern int pthread_rwlock_destroy(void* l);
+        [DllImport("c")] public static extern int pthread_rwlock_rdlock(void* l);
+        [DllImport("c")] public static extern int pthread_rwlock_wrlock(void* l);
+        [DllImport("c")] public static extern int pthread_rwlock_unlock(void* l);
+        [DllImport("c")] public static extern int usleep(uint microseconds);
+        [DllImport("c")] public static extern long sysconf(int name);
+        [DllImport("c")] public static extern int clock_gettime(int clock, long* timespec);
+    }
+}

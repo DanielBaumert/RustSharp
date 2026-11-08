@@ -1,0 +1,148 @@
+namespace System.Collections.Generic
+{
+    /// <summary>Rust's HashMap. Keys use IEq and IHash, or compare structurally.</summary>
+    [SendWhen(Bound.Send), SyncWhen(Bound.Sync)]
+    [CarriesBorrows]
+    public unsafe partial class Dictionary<K, V>
+    {
+        public struct Entry
+        {
+            public K Key;
+            public V Value;
+            internal int Next;
+            internal int Hash;
+        }
+
+        // Every entry is live: Remove moves the last entry into the gap (IndexMap's swap_remove), so there are
+        // no empty slots that would have to hold a zeroed key or value.
+
+        private List<Entry> _entries = new List<Entry>();
+        private int[] _buckets = new int[16];
+        public readonly int Count => _entries.Count;
+
+        private readonly int Find(in K key)
+        {
+            int hash = Mem.HashOf(in key);
+            int b = (hash & 0x7FFFFFFF) % _buckets.Length;
+            for (int i = _buckets[b] - 1; i >= 0; i = _entries.At(i).Next - 1)
+            {
+                ref readonly Entry e = ref _entries.At(i);
+                if (e.Hash == hash && Mem.EqualOf(in e.Key, in key)) return i;
+            }
+            return -1;
+        }
+
+        public readonly bool ContainsKey(in K key) => Find(in key) >= 0;
+
+        /// <summary>Inserts or replaces, like `insert`.</summary>
+        public void Set(K key, V value)
+        {
+            int i = Find(in key);
+            if (i >= 0)
+            {
+                _entries[i].Value = value;
+                return;
+            }
+            if (_entries.Count >= _buckets.Length * 2) Rehash();
+            int hash = Mem.HashOf(in key);
+            int b = (hash & 0x7FFFFFFF) % _buckets.Length;
+            _entries.Add(new Entry { Key = key, Value = value, Next = _buckets[b], Hash = hash });
+            _buckets[b] = _entries.Count;
+        }
+
+        /// <summary>Rust's HashMap::insert: replaces the value of an existing key and returns the old one.</summary>
+        public Option<V> Add(K key, V value)
+        {
+            var old = Remove(in key);
+            Set(key, value);
+            return old;
+        }
+
+        /// <summary>Rust's get: None when the key is missing.</summary>
+        public readonly Option<Ref<V>> Get(in K key)
+        {
+            int i = Find(in key);
+            return i < 0 ? Option<Ref<V>>.None : Option<Ref<V>>.Some(Ref<V>.Of(in _entries.At(i).Value));
+        }
+
+        public ref V this[in K key]
+        {
+            get
+            {
+                int i = Find(in key);
+                if (i < 0) Panic.Raise("key not found");
+                return ref _entries[i].Value;
+            }
+        }
+
+        /// <summary>Removes an entry and hands the value back, if there was one.</summary>
+        public Option<V> Remove(in K key)
+        {
+            int hash = Mem.HashOf(in key);
+            int b = (hash & 0x7FFFFFFF) % _buckets.Length;
+            int previous = -1;
+            for (int i = _buckets[b] - 1; i >= 0; i = _entries.At(i).Next - 1)
+            {
+                if (_entries.At(i).Hash == hash && Mem.EqualOf(in _entries.At(i).Key, in key))
+                {
+                    int next = _entries.At(i).Next;
+                    if (previous < 0) _buckets[b] = next;
+                    else _entries[previous].Next = next;
+                    int last = _entries.Count - 1;
+                    if (i != last) Relink(last, i);
+                    Entry removed = _entries.SwapRemove(i);
+                    return Option<V>.Some(removed.Value);
+                }
+                previous = i;
+            }
+            return Option<V>.None;
+        }
+
+        /// <summary>Points whatever leads to entry `from` at `to`, where SwapRemove is about to move it.</summary>
+        private void Relink(int from, int to)
+        {
+            int b = (_entries.At(from).Hash & 0x7FFFFFFF) % _buckets.Length;
+            if (_buckets[b] == from + 1)
+            {
+                _buckets[b] = to + 1;
+                return;
+            }
+            for (int j = _buckets[b] - 1; j >= 0; j = _entries.At(j).Next - 1)
+            {
+                if (_entries.At(j).Next == from + 1)
+                {
+                    _entries[j].Next = to + 1;
+                    return;
+                }
+            }
+        }
+
+        private void Rehash()
+        {
+            int[] buckets = new int[_buckets.Length * 2];
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                int b = (_entries.At(i).Hash & 0x7FFFFFFF) % buckets.Length;
+                _entries[i].Next = buckets[b];
+                buckets[b] = i + 1;
+            }
+            _buckets = buckets;
+        }
+
+        public readonly Enumerator GetEnumerator() => new Enumerator(_entries.Data, _entries.Count);
+
+        public ref struct Enumerator
+        {
+            private Entry* _p;
+            private int _i;
+            private int _n;
+            internal Enumerator(Entry* p, int n) { _p = p; _i = -1; _n = n; }
+            public bool MoveNext()
+            {
+                _i++;
+                return _i < _n;
+            }
+            public readonly ref readonly Entry Current { get => ref *(_p + _i); }
+        }
+    }
+}

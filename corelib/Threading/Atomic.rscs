@@ -1,0 +1,13 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    public static unsafe class Atomic
+    {
+        public static extern T Load<T>(T* p) where T : unmanaged;
+        public static extern void Store<T>(T* p, T value) where T : unmanaged;
+        public static extern T Add<T>(T* p, T value) where T : unmanaged;
+        public static extern T Exchange<T>(T* p, T value) where T : unmanaged;
+        public static extern T CompareExchange<T>(T* p, T expected, T value) where T : unmanaged;
+    }
+}

@@ -1,0 +1,50 @@
+using System;
+using System.Collections.Generic;
+class R { string _n; public R(string n) { _n = n; } ~R() { Console.WriteLine("drop " + _n); } public readonly string Name => _n; }
+class P
+{
+    static IEnumerable<int> Count(int n)
+    {
+        for (mut int i = 0; i < n; i++) yield return i * i;
+    }
+    static IEnumerable<int> Fib()
+    {
+        mut int a = 0, b = 1;
+        while (true)
+        {
+            yield return a;
+            int t = a + b;
+            a = b;
+            b = t;
+        }
+    }
+    static IEnumerable<string> Words()
+    {
+        var r = new R("frame local");
+        yield return "one";
+        yield return r.Name;
+        yield break;
+    }
+    static IEnumerable<R> Owned()
+    {
+        yield return new R("a");
+        yield return new R("b");
+    }
+    static void Main()
+    {
+        mut int s = 0;
+        foreach (var x in Count(5)) s += x;
+        Console.WriteLine(s);
+        foreach (var f in Fib())
+        {
+            if (f > 20) break;
+            Console.Write(f + " ");
+        }
+        Console.WriteLine();
+        foreach (var w in Words()) Console.WriteLine(w);
+        Console.WriteLine("-");
+        foreach (var w in Words()) { Console.WriteLine(w); break; }
+        Console.WriteLine("-");
+        foreach (var o in Owned()) Console.WriteLine(o.Name);
+    }
+}

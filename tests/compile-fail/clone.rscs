@@ -1,0 +1,12 @@
+using System;
+class NoClone { public int V; }
+[Clone] class Holder { public NoClone Inner = new NoClone(); }
+record R(int X, NoClone Y);
+class P
+{
+    static void Main()
+    {
+        var a = new NoClone();
+        var b = a.Clone(); // error: CS9922
+    }
+}

@@ -1,0 +1,19 @@
+using System;
+class C { public int V; }
+class E { public bool Use() => true; }
+class P
+{
+    static void Take(C c) { }
+    static bool Eat(E e) => true;
+    static void Main()
+    {
+        var a = new { Obj = new C(), N = 1 };
+        var x = a.Obj;
+        var y = a.Obj; // error: CS9900
+        mut var m = new C[,] { { new C() } };
+        var z = m[0, 0]; // error: CS9903
+        ref C slot = ref m[0, 0];
+        m = new C[,] { { new C() } }; // error: CS9907
+        slot = new C();
+    }
+}

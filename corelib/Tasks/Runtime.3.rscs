@@ -1,0 +1,66 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    public static unsafe partial class Runtime
+    {
+
+        /// <summary>Starts a job on the workers. The waker reaches it later, for Abort.</summary>
+        internal static Waker Start(IJob job)
+        {
+            StartWorkers();
+            var r = NewRecord(null, job);
+            Schedule(r);
+            return new Waker(r);
+        }
+
+        private sealed class RootJob : IJob
+        {
+            public int Done;
+            public Option<Task> Root;
+            public RootJob(Task root) { Root = Option<Task>.Some(Mem.Transmute<Task, Task>(root)); } // outlived by BlockOn
+            public bool Step()
+            {
+                if (Root.SlotMut.Poll()) { Done = 1; return true; }
+                return false;
+            }
+        }
+
+        private static Task Drive(Task task)
+        {
+            if (s_worker == null) s_worker = NewWorker(0);
+            var job = new RootJob(task);
+            ref RootJob view = ref job;
+            int* done = Mem.AddressOf(in view.Done);
+            var record = NewRecord(s_worker, job);
+            record->Pinned = 1;
+            record->Root = 1;
+            Schedule(record);
+            while (*done == 0) RunOne(Pop(s_worker));
+            Atomic.Store(Mem.AddressOf(in record->Finished), 1);
+            ref RootJob finished = ref Mem.AsRef((RootJob*)Mem.AddressOf(in record->Job));
+            Task result = finished.Root.Take().Unwrap();
+            Release(record);
+            return result;
+        }
+
+        /// <summary>Runs a task to completion on this thread, while it serves as a worker.</summary>
+        public static void BlockOn(Task task)
+        {
+            Drive(task);
+        }
+
+        public static T BlockOn<T>(Task<T> task)
+        {
+            Task<T> typed = (Task<T>)Drive(task);
+            return typed.TakeResult();
+        }
+
+        public static long NowMs()
+        {
+            long* ts = stackalloc long[2];
+            Pthread.clock_gettime(1, ts);
+            return ts[0] * 1000 + ts[1] / 1000000;
+        }
+    }
+}

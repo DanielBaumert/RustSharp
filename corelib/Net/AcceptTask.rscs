@@ -1,0 +1,36 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    internal sealed unsafe class AcceptTask<S> : IoTask<S>
+    {
+        private Arc<SocketHandle> _socket;
+        private delegate*<int, S> _make;
+        public AcceptTask(Arc<SocketHandle> socket, delegate*<int, S> make) { _socket = socket; _make = make; }
+        internal override bool PollCore()
+        {
+            if (!TaskRuntime.ConsumeBudget()) return false;
+            int fd = _socket.Value.Fd;
+            while (true)
+            {
+                int conn = Sys.accept4(fd, null, null, 0x80800);
+                if (conn >= 0)
+                {
+                    return Done(_make(conn));
+                }
+                int e = Sys.Errno;
+                if (e == Sys.EINTR) continue;
+                if (e == Sys.EAGAIN)
+                {
+                    if (Reactor.Wait(fd, false)) return false;
+                    continue;
+                }
+                return Fail(Address.ErrorText("accept"));
+            }
+        }
+    }
+}

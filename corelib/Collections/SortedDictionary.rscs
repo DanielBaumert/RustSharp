@@ -1,0 +1,57 @@
+namespace System.Collections.Generic
+{
+    /// <summary>Rust's BTreeMap: entries stay sorted by key.</summary>
+    [SendWhen(Bound.Send), SyncWhen(Bound.Sync)]
+    [CarriesBorrows]
+    public class SortedDictionary<K, V>
+    {
+        public struct Entry { public K Key; public V Value; }
+        private List<Entry> _entries = new List<Entry>();
+
+        public readonly int Count => _entries.Count;
+
+        private readonly int LowerBound(in K key)
+        {
+            int lo = 0, hi = _entries.Count;
+            while (lo < hi)
+            {
+                int mid = (lo + hi) / 2;
+                if (Mem.CompareOf(in _entries.At(mid).Key, in key) < 0) lo = mid + 1;
+                else hi = mid;
+            }
+            return lo;
+        }
+
+        private readonly bool Found(int i, in K key) => i < _entries.Count && Mem.CompareOf(in _entries.At(i).Key, in key) == 0;
+
+        public void Set(K key, V value)
+        {
+            int i = LowerBound(in key);
+            if (Found(i, in key))
+            {
+                _entries[i].Value = value;
+                return;
+            }
+            _entries.Insert(i, new Entry { Key = key, Value = value });
+        }
+
+        public readonly bool ContainsKey(in K key) => Found(LowerBound(in key), in key);
+
+        public readonly ref readonly V Get(in K key)
+        {
+            int i = LowerBound(in key);
+            if (!Found(i, in key)) Panic.Raise("key not found");
+            return ref _entries.At(i).Value;
+        }
+
+        public Option<V> Remove(in K key)
+        {
+            int i = LowerBound(in key);
+            if (!Found(i, in key)) return Option<V>.None;
+            Entry e = _entries.RemoveAt(i);
+            return Option<V>.Some(e.Value);
+        }
+
+        public readonly List<Entry>.Enumerator GetEnumerator() => _entries.GetEnumerator();
+    }
+}

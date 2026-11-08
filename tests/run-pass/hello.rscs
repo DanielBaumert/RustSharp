@@ -1,0 +1,13 @@
+using System;
+class P
+{
+    static int Add(int a, int b) => a + b;
+    static int Main()
+    {
+        Console.WriteLine("Hello from native C#");
+        mut int sum = 0;
+        for (mut int i = 0; i < 10; i++) sum = Add(sum, i);
+        Console.WriteLine(sum);
+        return 0;
+    }
+}

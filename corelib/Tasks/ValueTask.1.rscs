@@ -1,0 +1,14 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    [BorrowHolder, AsyncMethodBuilder(typeof(ValueTaskBuilder<>))]
+    public unsafe struct ValueTask<T>
+    {
+        private Task<T> _task;
+        public ValueTask(Task<T> task) { _task = task; }
+        public static ValueTask<T> FromCoroutine(void* frame, delegate*<void*, void*, int> resume, delegate*<void*, void> drop)
+            => new ValueTask<T>(Task<T>.FromCoroutine(frame, resume, drop));
+        public move TaskAwaiter<T> GetAwaiter() => _task.GetAwaiter();
+    }
+}

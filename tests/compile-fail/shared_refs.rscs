@@ -1,0 +1,19 @@
+class C { public int V; public void Mutate() { } public readonly int Get() => V; }
+class D
+{
+    int _n;
+    C _c = new C();
+    public readonly void Bad() { _n = 1; } // error: CS9917
+    public readonly void Bad2() { _c.Mutate(); } // error: CS9918
+    public readonly int Good() => _n + _c.Get();
+    public int Prop { get { _n = 2; return _n; } } // error: CS9917
+}
+interface IF { readonly int F() => 0; }
+class Derived : IF { public int F() => 1; } // error: CS9920
+class P
+{
+    static void A(in int x) { x.ToString(); }
+    static void B(in C c) { c.V = 1; } // error: CS9917
+    static void D2(in C c) { c.Mutate(); } // error: CS9918
+    static void Main() { }
+}

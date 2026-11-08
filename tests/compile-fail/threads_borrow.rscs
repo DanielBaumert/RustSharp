@@ -1,0 +1,23 @@
+using System;
+using System.Threading;
+class P
+{
+    static int S;
+    static readonly int[] Table = new int[2];
+    static void Main()
+    {
+        int n = 1;
+        var t = Thread.Run(() => n + 1); // error: CS9925
+
+        var m = new Mutex<int>(1);
+        ref int leak = ref m.Lock().Value; // error: CS9913
+        leak = 2;
+
+        var arc = new Arc<int>(1);
+        var moved = arc;
+        Console.WriteLine(arc.Count); // error: CS9901
+
+        Table[0] = 1; // error: CS9917
+        S = 2; // error: CS9921
+    }
+}

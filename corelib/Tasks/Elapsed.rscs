@@ -1,0 +1,10 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>The error of Task.Timeout.</summary>
+    public sealed class Elapsed
+    {
+        public override readonly string ToString() => "deadline has elapsed";
+    }
+}

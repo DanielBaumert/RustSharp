@@ -1,0 +1,150 @@
+namespace System
+{
+    public readonly unsafe partial struct Decimal
+    {
+
+        public static decimal operator /(decimal a, decimal b)
+        {
+            uint* n = stackalloc uint[Words];
+            uint* d = stackalloc uint[Words];
+            uint* q = stackalloc uint[Words];
+            uint* r = stackalloc uint[Words];
+            uint* digit = stackalloc uint[Words];
+            uint* next = stackalloc uint[Words];
+            Load(a, n);
+            Load(b, d);
+            if (IsZero(d))
+            {
+                Fail(DividedByZero, "attempt to divide by zero");
+                return default;
+            }
+
+            int scale = ScaleOf(a) - ScaleOf(b);
+            if (scale < 0)
+            {
+                ScaleUp(n, -scale);
+                scale = 0;
+            }
+
+            DivMod(n, d, q, r);
+
+            // An exact quotient keeps its natural scale, so 1.00m / 2m is 0.50. Once digits had to be
+            // generated, trailing zeros of the result are removed again.
+            bool generated = !IsZero(r);
+            while (!IsZero(r) && scale <= MaxScale && Fits(q))
+            {
+                MulSmall(r, 10);
+                DivMod(r, d, digit, next);
+                MulSmall(q, 10);
+                Add(q, digit);
+                Copy(next, r);
+                scale++;
+            }
+            decimal result = Make(q, scale, IsNeg(a) != IsNeg(b), !IsZero(r));
+            return generated ? WithoutTrailingZeros(result) : result;
+        }
+
+        private static decimal WithoutTrailingZeros(decimal d)
+        {
+            uint* w = stackalloc uint[Words];
+            uint* t = stackalloc uint[Words];
+            Load(d, w);
+            int scale = ScaleOf(d);
+            while (scale > 0)
+            {
+                Copy(w, t);
+                if (DivSmall(t, 10) != 0) break;
+                Copy(t, w);
+                scale--;
+            }
+            return new decimal((int)w[0], (int)w[1], (int)w[2], IsNeg(d), (byte)scale);
+        }
+
+        public static decimal operator %(decimal a, decimal b)
+        {
+            uint* x = stackalloc uint[Words];
+            uint* y = stackalloc uint[Words];
+            uint* q = stackalloc uint[Words];
+            uint* r = stackalloc uint[Words];
+            Align(a, b, x, y, out int scale);
+            if (IsZero(y))
+            {
+                Fail(DividedByZero, "attempt to calculate the remainder with a divisor of zero");
+                return default;
+            }
+            if (Compare(x, y) < 0) return a;
+            DivMod(x, y, q, r);
+            return Make(r, scale, IsNeg(a), false);
+        }
+
+        private static int CompareValues(decimal a, decimal b)
+        {
+            uint* x = stackalloc uint[Words];
+            uint* y = stackalloc uint[Words];
+            Align(a, b, x, y, out int scale);
+            bool na = IsNeg(a) && !IsZero(x);
+            bool nb = IsNeg(b) && !IsZero(y);
+            if (na != nb) return na ? -1 : 1;
+            int c = Compare(x, y);
+            return na ? -c : c;
+        }
+
+        public static bool operator ==(decimal a, decimal b) => CompareValues(a, b) == 0;
+        public static bool operator !=(decimal a, decimal b) => CompareValues(a, b) != 0;
+        public static bool operator <(decimal a, decimal b) => CompareValues(a, b) < 0;
+        public static bool operator <=(decimal a, decimal b) => CompareValues(a, b) <= 0;
+        public static bool operator >(decimal a, decimal b) => CompareValues(a, b) > 0;
+        public static bool operator >=(decimal a, decimal b) => CompareValues(a, b) >= 0;
+
+        public static implicit operator decimal(byte v) => new decimal((long)v);
+        public static implicit operator decimal(sbyte v) => new decimal((long)v);
+        public static implicit operator decimal(short v) => new decimal((long)v);
+        public static implicit operator decimal(ushort v) => new decimal((long)v);
+        public static implicit operator decimal(char v) => new decimal((long)v);
+        public static implicit operator decimal(int v) => new decimal((long)v);
+        public static implicit operator decimal(uint v) => new decimal((ulong)v);
+        public static implicit operator decimal(long v) => new decimal(v);
+        public static implicit operator decimal(ulong v) => new decimal(v);
+        public static explicit operator decimal(float v) => new decimal(v);
+        public static explicit operator decimal(double v) => new decimal(v);
+
+        /// <summary>The integer part, as a sign and a 64-bit magnitude.</summary>
+        private static ulong Truncated(decimal d)
+        {
+            uint* w = stackalloc uint[Words];
+            Load(d, w);
+            for (int i = 0; i < ScaleOf(d); i++) DivSmall(w, 10);
+            if (w[2] != 0) { Fail(Overflowed, "decimal value does not fit the integer type"); return 0; }
+            return ((ulong)w[1] << 32) | w[0];
+        }
+
+        private static long ToSigned(decimal d, long min, ulong max)
+        {
+            ulong m = Truncated(d);
+            if (IsNeg(d))
+            {
+                if (m > (ulong)(-(min + 1)) + 1) { Fail(Overflowed, "decimal value does not fit the integer type"); return 0; }
+                return -(long)m;
+            }
+            if (m > max) { Fail(Overflowed, "decimal value does not fit the integer type"); return 0; }
+            return (long)m;
+        }
+
+        private static ulong ToUnsigned(decimal d, ulong max)
+        {
+            ulong m = Truncated(d);
+            if ((IsNeg(d) && m != 0) || m > max) { Fail(Overflowed, "decimal value does not fit the integer type"); return 0; }
+            return m;
+        }
+
+        public static explicit operator sbyte(decimal d) => (sbyte)ToSigned(d, -128, 127);
+        public static explicit operator short(decimal d) => (short)ToSigned(d, -32768, 32767);
+        public static explicit operator int(decimal d) => (int)ToSigned(d, -2147483648, 2147483647);
+        public static explicit operator long(decimal d) => ToSigned(d, long.MinValue, 9223372036854775807);
+        public static explicit operator byte(decimal d) => (byte)ToUnsigned(d, 255);
+        public static explicit operator ushort(decimal d) => (ushort)ToUnsigned(d, 65535);
+        public static explicit operator char(decimal d) => (char)ToUnsigned(d, 65535);
+        public static explicit operator uint(decimal d) => (uint)ToUnsigned(d, 4294967295);
+        public static explicit operator ulong(decimal d) => ToUnsigned(d, 18446744073709551615);
+    }
+}

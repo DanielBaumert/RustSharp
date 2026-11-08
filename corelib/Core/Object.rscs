@@ -1,0 +1,12 @@
+namespace System
+{
+    public class Object
+    {
+        public Object() { }
+        public virtual readonly string ToString() => "object";
+        public readonly Type GetType() => Type.Of(Mem.TypeNameOf(this));
+        public virtual readonly bool Equals(object other) => false;
+        public virtual readonly int GetHashCode() => 0;
+        protected virtual void Finalize() { }
+    }
+}

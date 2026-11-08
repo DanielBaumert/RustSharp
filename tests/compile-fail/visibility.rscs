@@ -1,0 +1,11 @@
+using System;
+class P
+{
+    static void Main()
+    {
+        string s = "abc";
+        s.SetByte(0, 120); // error: CS0122
+        string t = string.Allocate(4); // error: CS0122
+        Libc.exit(0); // error: CS0122
+    }
+}

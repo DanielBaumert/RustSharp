@@ -1,0 +1,42 @@
+using System;
+class P
+{
+    static str Dangling()
+    {
+        string local = "temp".ToString();
+        return local.Trim(); // error: CS9912
+    }
+
+    static void Main()
+    {
+        mut string s = "hello world";
+        str view = s.Slice(0, 5);
+        s.PushStr("!"); // error: CS9909
+        Console.WriteLine(view);
+
+        mut str kept = default;
+        {
+            string inner = "inner".ToString();
+            kept = inner.AsStr(); // error: CS9912
+        }
+        Console.WriteLine(kept);
+
+        mut str piece = default;
+        {
+            string separator = ",".ToString();
+            str text = "a,b";
+            foreach (var part in text.Split(separator)) piece = part; // error: CS9912
+        }
+        Console.WriteLine(piece);
+
+        mut string sliced = "abcdef";
+        str middle = sliced[1..3];
+        sliced.Clear(); // error: CS9909
+        Console.WriteLine(middle);
+
+        string moved = "m".ToString();
+        str m = moved;
+        string taken = moved; // error: CS9906
+        Console.WriteLine(m);
+    }
+}

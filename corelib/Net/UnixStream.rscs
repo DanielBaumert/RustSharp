@@ -1,0 +1,21 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    public sealed class UnixStream : SocketStream
+    {
+        internal UnixStream(int fd) : base(fd) { }
+        internal static UnixStream Make(int fd) => new UnixStream(fd);
+
+        public static unsafe Task<Result<UnixStream, IoError>> ConnectAsync(string path)
+        {
+            Sockaddr a = default;
+            if (!Address.Unix(path, &a)) return IoTask<UnixStream>.Failed("unix socket path is too long");
+            return new ConnectTask<UnixStream>(a, &Make);
+        }
+    }
+}

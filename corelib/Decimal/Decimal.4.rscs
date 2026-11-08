@@ -1,0 +1,149 @@
+namespace System
+{
+    public readonly unsafe partial struct Decimal
+    {
+
+        public static explicit operator double(decimal d)
+        {
+            double m = (double)d._hi * 18446744073709551616.0 + (double)d._mid * 4294967296.0 + d._lo;
+            double scale = 1;
+            for (int i = 0; i < ScaleOf(d); i++) scale *= 10;
+            double r = m / scale;
+            return IsNeg(d) ? -r : r;
+        }
+
+        public static explicit operator float(decimal d) => (float)(double)d;
+
+        // Rust has checked_add and friends; the operators panic. Inside Checked the failure points
+        // record what went wrong instead of panicking, and the computation gives up with a zero.
+        private const int Overflowed = 1, DividedByZero = 2, Malformed = 3;
+        [ThreadStatic] private static int s_checking;
+        [ThreadStatic] private static int s_failed;
+
+        private static void Fail(int kind, string message)
+        {
+            if (s_checking == 0) Panic.Raise(message);
+            else if (s_failed == 0) s_failed = kind;
+        }
+
+        private static void BeginChecked()
+        {
+            s_checking++;
+            s_failed = 0;
+        }
+
+        private static int EndChecked()
+        {
+            s_checking--;
+            int failed = s_failed;
+            s_failed = 0;
+            return failed;
+        }
+
+        /// <summary>Rust's str::parse.</summary>
+        public static Result<decimal, ParseError> Parse(string s)
+        {
+            BeginChecked();
+            decimal d = ParseOrPanic(s);
+            int failed = EndChecked();
+            if (failed == Malformed) return Result<decimal, ParseError>.Err(new ParseError("invalid decimal"));
+            if (failed != 0) return Result<decimal, ParseError>.Err(new ParseError("number too large"));
+            return Result<decimal, ParseError>.Ok(d);
+        }
+
+        public static Option<decimal> CheckedAdd(decimal a, decimal b) => Checked(a, b, 0);
+        public static Option<decimal> CheckedSub(decimal a, decimal b) => Checked(a, b, 1);
+        public static Option<decimal> CheckedMul(decimal a, decimal b) => Checked(a, b, 2);
+        public static Option<decimal> CheckedDiv(decimal a, decimal b) => Checked(a, b, 3);
+        public static Option<decimal> CheckedRem(decimal a, decimal b) => Checked(a, b, 4);
+
+        private static Option<decimal> Checked(decimal a, decimal b, int op)
+        {
+            BeginChecked();
+            decimal r = op == 0 ? a + b : op == 1 ? a - b : op == 2 ? a * b : op == 3 ? a / b : a % b;
+            return EndChecked() == 0 ? Option<decimal>.Some(r) : Option<decimal>.None;
+        }
+
+        public static Option<long> CheckedToInt64(decimal a)
+        {
+            BeginChecked();
+            long r = (long)a;
+            return EndChecked() == 0 ? Option<long>.Some(r) : Option<long>.None;
+        }
+
+        internal static decimal ParseOrPanic(string s)
+        {
+            uint* w = stackalloc uint[Words];
+            Clear(w);
+            int i = 0;
+            int n = s.Length;
+            bool negative = n > 0 && s.ByteAt(0) == '-';
+            if (negative || (n > 0 && s.ByteAt(0) == '+')) i = 1;
+            int scale = 0;
+            bool seenPoint = false;
+            bool any = false;
+            for (; i < n; i++)
+            {
+                char c = (char)s.ByteAt(i);
+                if (c == '.' && !seenPoint) { seenPoint = true; continue; }
+                if (!char.IsDigit(c)) break;
+                any = true;
+                MulSmall(w, 10);
+                AddSmall(w, (uint)(c - '0'));
+                if (seenPoint) scale++;
+            }
+            if (!any)
+            {
+                Fail(Malformed, "invalid decimal");
+                return default;
+            }
+
+            if (i < n && (s.ByteAt(i) == 'e' || s.ByteAt(i) == 'E'))
+            {
+                i++;
+                bool negativeExponent = i < n && s.ByteAt(i) == '-';
+                if (i < n && (s.ByteAt(i) == '-' || s.ByteAt(i) == '+')) i++;
+                int exponent = 0;
+                for (; i < n && char.IsDigit((char)s.ByteAt(i)); i++) exponent = exponent * 10 + (s.ByteAt(i) - '0');
+                scale += negativeExponent ? exponent : -exponent;
+            }
+            if (i != n)
+            {
+                Fail(Malformed, "invalid decimal");
+                return default;
+            }
+
+            if (scale < 0)
+            {
+                ScaleUp(w, -scale);
+                scale = 0;
+            }
+            return Make(w, scale, negative, false);
+        }
+
+        public override string ToString()
+        {
+            uint* w = stackalloc uint[Words];
+            Load(this, w);
+            int scale = ScaleOf(this);
+            bool negative = IsNeg(this) && !IsZero(w);
+            char* digits = stackalloc char[40];
+            int n = 0;
+            while (!IsZero(w) || n <= scale)
+                digits[n++] = (char)('0' + (int)DivSmall(w, 10));
+
+            int length = n + (negative ? 1 : 0) + (scale > 0 ? 1 : 0);
+            string s = String.Allocate(length);
+            int o = 0;
+            if (negative) s.SetByte(o++, (byte)('-'));
+            for (int i = n - 1; i >= 0; i--)
+            {
+                s.SetByte(o++, (byte)(digits[i]));
+                if (i == scale && scale > 0) s.SetByte(o++, (byte)('.'));
+            }
+            return s;
+        }
+
+        public override int GetHashCode() => (int)(_lo ^ _mid ^ _hi);
+    }
+}

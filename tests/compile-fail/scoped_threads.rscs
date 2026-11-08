@@ -1,0 +1,14 @@
+using System;
+using System.Threading;
+class P
+{
+    static void Main()
+    {
+        mut int a = 0;
+        {
+            mut var scope = new ThreadScope();
+            scope.Run(() => { a = 1; });
+            a = 2; // error: CS9907
+        }
+    }
+}

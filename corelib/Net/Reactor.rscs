@@ -1,0 +1,128 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    internal static unsafe partial class Reactor
+    {
+        private const uint In = 1, Out = 4, Err = 8, Hup = 16, EdgeTriggered = 0x80000000;
+        private const int Add = 1, Del = 2, Mod = 3;
+        private const int EventSize = 12; // struct epoll_event is packed on x86-64
+
+        private static void* s_lock;
+        private static int s_state;
+        private static int s_epoll;
+        private static int s_wake;
+        private static IoSlot* s_slots;
+        private static int s_capacity;
+        private static System.Collections.Generic.List<TimerEntry>* s_timers;
+
+        private static void Start()
+        {
+            if (Atomic.Load(Mem.AddressOf(in s_state)) == 2) return;
+            if (Atomic.CompareExchange(Mem.AddressOf(in s_state), 0, 1) == 0)
+            {
+                s_lock = Libc.malloc(64);
+                Pthread.pthread_mutex_init(s_lock, null);
+                s_epoll = Sys.epoll_create1(0x80000);
+                s_wake = Sys.eventfd(0, 0x80800);
+                s_timers = (System.Collections.Generic.List<TimerEntry>*)Libc.malloc(8);
+                Mem.Write(s_timers, new System.Collections.Generic.List<TimerEntry>());
+                byte* ev = stackalloc byte[EventSize];
+                *(uint*)ev = In;
+                *(ulong*)(ev + 4) = (ulong)s_wake;
+                Sys.epoll_ctl(s_epoll, Add, s_wake, ev);
+                ulong id;
+                Pthread.pthread_create(&id, null, &Loop, null);
+                Pthread.pthread_detach(id);
+                Atomic.Store(Mem.AddressOf(in s_state), 2);
+            }
+            while (Atomic.Load(Mem.AddressOf(in s_state)) != 2) Pthread.usleep(10);
+        }
+
+        private static IoSlot* Slot(int fd)
+        {
+            if (fd >= s_capacity)
+            {
+                int bigger = s_capacity == 0 ? 1024 : s_capacity;
+                while (bigger <= fd) bigger *= 2;
+                var slots = (IoSlot*)Libc.calloc(bigger, Mem.SizeOf<IoSlot>());
+                if (s_capacity > 0) Libc.memcpy(slots, s_slots, (long)s_capacity * Mem.SizeOf<IoSlot>());
+                Libc.free(s_slots);
+                s_slots = slots;
+                s_capacity = bigger;
+            }
+            return s_slots + fd;
+        }
+
+        /// <summary>
+        /// Parks the running task until the socket is ready; false means it is ready already and the
+        /// caller should try again. The socket is registered once, edge-triggered. An edge that arrives
+        /// while nobody waits is remembered in the slot, so readiness cannot get lost between a failed
+        /// attempt and this call. A stale flag only costs one more attempt.
+        /// </summary>
+        public static bool Wait(int fd, bool write)
+        {
+            Start();
+            Waker waker = TaskRuntime.CurrentWaker();
+            Pthread.pthread_mutex_lock(s_lock);
+            IoSlot* slot = Slot(fd);
+            if (slot->Registered == 0)
+            {
+                byte* ev = stackalloc byte[EventSize];
+                *(uint*)ev = In | Out | EdgeTriggered;
+                *(ulong*)(ev + 4) = (ulong)fd;
+                slot->Registered = 1;
+                Sys.epoll_ctl(s_epoll, Add, fd, ev);
+            }
+            int* ready = write ? Mem.AddressOf(in slot->WriteReady) : Mem.AddressOf(in slot->ReadReady);
+            bool parked = *ready == 0;
+            *ready = 0;
+            if (parked)
+            {
+                Option<Waker>* target = write ? Mem.AddressOf(in slot->Write) : Mem.AddressOf(in slot->Read);
+                var old = Mem.Replace(ref Mem.AsRef(target), Option<Waker>.Some(waker));
+            }
+            Pthread.pthread_mutex_unlock(s_lock);
+            return parked;
+        }
+
+        public static void Close(int fd)
+        {
+            Option<Waker> read = Option<Waker>.None, write = Option<Waker>.None;
+            if (Atomic.Load(Mem.AddressOf(in s_state)) == 2)
+            {
+                Pthread.pthread_mutex_lock(s_lock);
+                if (fd < s_capacity)
+                {
+                    IoSlot* slot = s_slots + fd;
+                    if (slot->Registered != 0) Sys.epoll_ctl(s_epoll, Del, fd, null);
+                    slot->Registered = 0;
+                    slot->ReadReady = 0;
+                    slot->WriteReady = 0;
+                    read = slot->Read.Take();
+                    write = slot->Write.Take();
+                }
+                Pthread.pthread_mutex_unlock(s_lock);
+            }
+            Sys.close(fd);
+            read.Wake();
+            write.Wake();
+        }
+
+        public static void AddTimer(long deadline, Waker waker, Arc<AtomicInt> fired)
+        {
+            Start();
+            var e = new TimerEntry { Deadline = deadline, Waker = waker, Fired = fired };
+            Pthread.pthread_mutex_lock(s_lock);
+            ref var timers = ref Mem.AsRef(s_timers);
+            timers.Add(e);
+            Pthread.pthread_mutex_unlock(s_lock);
+            long one = 1;
+            Sys.write(s_wake, &one, 8);
+        }
+    }
+}

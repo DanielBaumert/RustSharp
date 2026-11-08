@@ -1,0 +1,20 @@
+namespace System
+{
+    public abstract class Array : System.Collections.IEnumerable
+    {
+        // Only here so that foreach binds on multidimensional arrays; it is lowered to nested loops.
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => Panic.Unreachable<System.Collections.IEnumerator>();
+
+        // Layout is known to the compiler: the length sits right behind the object header.
+        private long _length;
+        public int Length => (int)_length;
+        public long LongLength => _length;
+        public readonly int GetLength(int dimension)
+        {
+            if (dimension != 0) Panic.Raise("index out of bounds: the array has one dimension");
+            return (int)_length;
+        }
+        public readonly int GetLowerBound(int dimension) => 0;
+        public readonly int GetUpperBound(int dimension) => GetLength(dimension) - 1;
+    }
+}

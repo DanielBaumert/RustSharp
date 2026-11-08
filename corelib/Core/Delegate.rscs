@@ -1,0 +1,40 @@
+namespace System
+{
+    public abstract class Delegate
+    {
+        // Layout is known to the compiler. _owner is the address of an owned receiver, _self the one that
+        // gets called: a closure that borrows its environment has no owner, and _owner is 0 (Rust's
+        // Option<Box<dyn Any>> with the null-pointer niche). The compiler writes it and drops the owner.
+        internal nint _owner;
+        internal unsafe void* _self;
+        internal unsafe void* _fn;
+    }
+
+    public abstract class MulticastDelegate : Delegate { }
+
+    public struct Void { }
+
+    public class Attribute { }
+
+    [Flags]
+    public enum AttributeTargets { All = 32767, Class = 4, Struct = 8, Method = 64, Parameter = 2048, Field = 256, Property = 128, Assembly = 1, Module = 2, Enum = 16, Constructor = 32, Event = 512, Interface = 1024, Delegate = 4096, ReturnValue = 8192, GenericParameter = 16384 }
+
+    public sealed class AttributeUsageAttribute : Attribute
+    {
+        public AttributeUsageAttribute(AttributeTargets validOn) { }
+        public bool AllowMultiple { get; set; }
+        public bool Inherited { get; set; }
+    }
+
+    public sealed class FlagsAttribute : Attribute { }
+
+    public sealed class ParamArrayAttribute : Attribute { }
+
+    public sealed class ObsoleteAttribute : Attribute { }
+
+    public struct RuntimeTypeHandle { }
+
+    public struct RuntimeMethodHandle { }
+
+    public struct RuntimeFieldHandle { }
+}

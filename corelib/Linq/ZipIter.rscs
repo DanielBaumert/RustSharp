@@ -1,0 +1,18 @@
+namespace System.Linq
+{
+    public unsafe ref struct ZipIter<A, B, I, J> : IIter<(A, B)> where I : IIter<A>, allows ref struct where J : IIter<B>, allows ref struct
+    {
+        private I _a;
+        private J _b;
+        private (A, B) _current;
+        internal ZipIter(I a, J b) { _a = a; _b = b; }
+        public (A, B)* Next()
+        {
+            A* x = _a.Next();
+            B* y = _b.Next();
+            if (x == null || y == null) return null;
+            _current = (Mem.CloneOf(in *x), Mem.CloneOf(in *y));
+            return Mem.AddressOf(in _current);
+        }
+    }
+}

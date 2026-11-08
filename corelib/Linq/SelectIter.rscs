@@ -1,0 +1,17 @@
+namespace System.Linq
+{
+    public unsafe ref struct SelectIter<T, U, I> : IIter<U> where I : IIter<T>, allows ref struct
+    {
+        private I _inner;
+        private Selector<T, U> _map;
+        private Option<U> _current;
+        internal SelectIter(I inner, Selector<T, U> map) { _inner = inner; _map = map; _current = Option<U>.None; }
+        public U* Next()
+        {
+            T* item = _inner.Next();
+            if (item == null) return null;
+            _current = Option<U>.Some(_map(in *item));
+            return Mem.AddressOf(in _current.Slot);
+        }
+    }
+}

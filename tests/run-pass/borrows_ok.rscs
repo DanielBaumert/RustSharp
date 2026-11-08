@@ -1,0 +1,76 @@
+using System;
+using System.Collections.Generic;
+class Data { public int V; public string Name = "d"; public readonly int Get() => V; public void Set(int v) { V = v; } }
+ref struct View
+{
+    ref int _p;
+    public View(ref int p) { _p = ref p; }
+    public readonly int Read() => _p;
+    public void Write(int v) { _p = v; }
+}
+class P
+{
+    static ref 'a int Longest(ref 'a int x, ref 'a int y) { if (x > y) return ref x; return ref y; }
+    static ref int First(ref int x, scoped ref int y) { y = 0; return ref x; }
+    static void Fill(ref Data d) { d.Set(5); d = new Data(); d.Set(6); }
+    static int Peek(in Data d) => d.Get();
+    static void Main()
+    {
+        mut int a = 1, b = 2;
+        // NLL: the borrow ends at its last use, not at the end of the scope.
+        ref int r = ref a;
+        r = 10;
+        a = 11;
+        Console.WriteLine(a);
+
+        ref int l = ref Longest(ref a, ref b);
+        l = 100;
+        Console.WriteLine(a);
+        b = 5;
+
+        ref int f = ref First(ref a, ref b);
+        b = 7;
+        f = 1;
+        Console.WriteLine(a + b);
+
+        mut var d = new Data();
+        Fill(ref d);
+        Console.WriteLine(Peek(in d));
+        Console.WriteLine(Peek(d));
+        d.V = 3;
+        ref int v = ref d.V;
+        v = 4;
+        string name = d.Name;
+        Console.WriteLine(d.Get() + name.Length);
+
+        // Disjoint fields can be borrowed at the same time.
+        var s = new Pt();
+        ref int sx = ref s.X;
+        ref int sy = ref s.Y;
+        sx = 1; sy = 2;
+        Console.WriteLine(s.X + s.Y);
+
+        // Two-phase style: arguments are evaluated before the receiver is borrowed.
+        mut var list = new List<int>();
+        list.Add(1);
+        list.Add(list.Count);
+        Console.WriteLine(list[1]);
+
+        mut var view = new View(ref a);
+        view.Write(50);
+        Console.WriteLine(view.Read());
+        a = 51;
+        Console.WriteLine(a);
+
+        // Moving in only one branch, then reinitializing, is fine.
+        mut var m = new Data();
+        if (a > 0) { var t = m; m = new Data(); }
+        m.Set(1);
+        Console.WriteLine(m.V);
+
+        mut Data n = new Data();
+        for (mut int i = 0; i < 2; i++) { var t = n; n = new Data(); n.Set(t.V + i + 1); }
+        Console.WriteLine(n.V);
+    }
+}
+struct Pt { public int X, Y; }

@@ -1,0 +1,13 @@
+namespace System.Linq
+{
+    [Mut] public delegate bool Predicate<T>(in T item);
+    [Mut] public delegate U Selector<T, U>(in T item);
+    [Mut] public delegate A Accumulator<A, T>(A acc, in T item);
+    [Mut] public delegate void Visitor<T>(in T item);
+
+    /// <summary>Rust's Iterator: each call lends the next element, null at the end.</summary>
+    public unsafe interface IIter<T>
+    {
+        T* Next();
+    }
+}

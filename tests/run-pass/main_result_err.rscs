@@ -1,0 +1,14 @@
+using System;
+// exit: 1
+class Noisy { ~Noisy() { Console.WriteLine("dropped"); } }
+class P
+{
+    static Result<int, ParseError> Main()
+    {
+        var keep = new Noisy();
+        Console.WriteLine("parsing");
+        int n = int.Parse("forty-two")?;
+        Console.WriteLine("never " + n.ToString());
+        return Result<int, ParseError>.Ok(n);
+    }
+}

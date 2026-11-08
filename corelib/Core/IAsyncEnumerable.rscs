@@ -1,0 +1,7 @@
+namespace System.Collections.Generic
+{
+    [BorrowHolder] public interface IAsyncEnumerable<T>
+    {
+        move IAsyncEnumerator<T> GetAsyncEnumerator(System.Threading.CancellationToken token = default);
+    }
+}

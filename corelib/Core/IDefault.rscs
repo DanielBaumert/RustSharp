@@ -1,0 +1,8 @@
+namespace System
+{
+    /// <summary>Rust's Default: `T.Default()` in generic code with `where T : IDefault<T>`.</summary>
+    public interface IDefault<T> where T : IDefault<T>
+    {
+        static abstract T Default();
+    }
+}

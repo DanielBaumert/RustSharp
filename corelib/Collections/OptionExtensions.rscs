@@ -1,0 +1,37 @@
+namespace System
+{
+    /// <summary>Rust's Option methods that need a nested type.</summary>
+    public static class OptionExtensions
+    {
+        /// <summary>Option&lt;Result&lt;T, E&gt;&gt; to Result&lt;Option&lt;T&gt;, E&gt;: None becomes Ok(None).</summary>
+        public static Result<Option<T>, E> Transpose<T, E>(this Option<Result<T, E>> o)
+        {
+            if (o.IsNone) return Result<Option<T>, E>.Ok(Option<T>.None);
+            var inner = o.Unwrap();
+            if (inner.IsErr) return Result<Option<T>, E>.Err(inner.UnwrapErr());
+            return Result<Option<T>, E>.Ok(Option<T>.Some(inner.Unwrap()));
+        }
+
+        /// <summary>Rust's unwrap_or_default: needs `T : IDefault<T>`, so None never becomes a null.</summary>
+        public static T UnwrapOrDefault<T>(this Option<T> o) where T : IDefault<T> => o.IsSome ? o.Unwrap() : T.Default();
+
+        public static Option<T> Flatten<T>(this Option<Option<T>> o) => o.IsSome ? o.Unwrap() : Option<T>.None;
+
+        public static (Option<T>, Option<U>) Unzip<T, U>(this Option<(T, U)> o)
+        {
+            if (o.IsNone) return (Option<T>.None, Option<U>.None);
+            var (a, b) = o.Unwrap();
+            return (Option<T>.Some(a), Option<U>.Some(b));
+        }
+
+        public static Option<T> Cloned<T>(this Option<Ref<T>> o) => o.IsSome ? Option<T>.Some(Mem.CloneOf(in o.Unwrap().Value)) : Option<T>.None;
+        public static Option<T> Cloned<T>(this Option<RefMut<T>> o) => o.IsSome ? Option<T>.Some(Mem.CloneOf(in o.Unwrap().Value)) : Option<T>.None;
+        public static Option<T> Copied<[Copy] T>(this Option<Ref<T>> o) => o.Cloned();
+        public static Option<T> Copied<[Copy] T>(this Option<RefMut<T>> o) => o.Cloned();
+
+        public static Option<Ref<T>> AsDeref<T>(this in Option<Rc<T>> o) => o.IsSome ? Option<Ref<T>>.Some(Ref<T>.Of(in o.Slot.Value)) : Option<Ref<T>>.None;
+        public static Option<Ref<T>> AsDeref<T>(this in Option<System.Threading.Arc<T>> o) => o.IsSome ? Option<Ref<T>>.Some(Ref<T>.Of(in o.Slot.Value)) : Option<Ref<T>>.None;
+        public static Option<Ref<T>> AsDeref<T>(this in Option<Box<T>> o) => o.IsSome ? Option<Ref<T>>.Some(Ref<T>.Of(in o.Slot.Value)) : Option<Ref<T>>.None;
+        public static Option<RefMut<T>> AsDerefMut<T>(this ref Option<Box<T>> o) => o.IsSome ? Option<RefMut<T>>.Some(RefMut<T>.Of(ref o.SlotMut.ValueMut)) : Option<RefMut<T>>.None;
+    }
+}

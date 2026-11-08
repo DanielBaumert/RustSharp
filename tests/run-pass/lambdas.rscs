@@ -1,0 +1,26 @@
+using System;
+delegate int F(int x);
+[Mut] delegate void G();
+class R { public int V = 4; ~R() { Console.WriteLine("captured dropped"); } }
+class P
+{
+    static int Apply(in F f, int x) => f(x);
+    static F MakeAdder(int n) => move x => x + n;
+    static void Main()
+    {
+        F twice = x => x * 2;
+        Console.WriteLine(twice(21));
+        F add = MakeAdder(10);
+        Console.WriteLine(Apply(in add, 5));
+        {
+            mut int total = 0;
+            mut G bump = () => { total++; Console.WriteLine(total); };
+            bump();
+            bump();
+        }
+        var r = new R();
+        F useR = x => x + r.V;
+        Console.WriteLine(useR(1));
+        Console.WriteLine("end");
+    }
+}

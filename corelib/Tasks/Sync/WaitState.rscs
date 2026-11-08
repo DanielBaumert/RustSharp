@@ -1,0 +1,61 @@
+using System.Collections.Generic;
+using System.Threading;
+
+namespace System.Threading.Tasks
+{
+    internal unsafe struct WaitState
+    {
+        public long Refs;
+        public void* Lock;
+        public long Available;
+        public List<Waker> Waiters;
+
+        public static WaitState* Create(long available)
+        {
+            var s = (WaitState*)Libc.calloc(1, Mem.SizeOf<WaitState>());
+            s->Refs = 1;
+            s->Available = available;
+            s->Lock = Libc.malloc(64);
+            Pthread.pthread_mutex_init(s->Lock, null);
+            Mem.Write(Mem.AddressOf(in s->Waiters), new List<Waker>());
+            return s;
+        }
+
+        public static WaitState* Retain(WaitState* s)
+        {
+            Atomic.Add(Mem.AddressOf(in s->Refs), 1L);
+            return s;
+        }
+
+        public static void Release(WaitState* s)
+        {
+            if (Atomic.Add(Mem.AddressOf(in s->Refs), -1L) != 1) return;
+            Pthread.pthread_mutex_destroy(s->Lock);
+            Libc.free(s->Lock);
+            Mem.DropInPlace(Mem.AddressOf(in s->Waiters));
+            Libc.free(s);
+        }
+
+        /// <summary>Takes a unit, or queues the running task. Waiters are served in order.</summary>
+        public static bool TryAcquire(WaitState* s)
+        {
+            Pthread.pthread_mutex_lock(s->Lock);
+            bool got = s->Available > 0;
+            if (got) s->Available--;
+            else Mem.AsRef(Mem.AddressOf(in s->Waiters)).Add(Runtime.CurrentWaker());
+            Pthread.pthread_mutex_unlock(s->Lock);
+            return got;
+        }
+
+        public static void Give(WaitState* s)
+        {
+            Option<Waker> next = Option<Waker>.None;
+            Pthread.pthread_mutex_lock(s->Lock);
+            s->Available++;
+            ref List<Waker> waiters = ref Mem.AsRef(Mem.AddressOf(in s->Waiters));
+            if (waiters.Count > 0) next = Option<Waker>.Some(waiters.RemoveAt(0));
+            Pthread.pthread_mutex_unlock(s->Lock);
+            next.Wake();
+        }
+    }
+}

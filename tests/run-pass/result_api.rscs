@@ -1,0 +1,69 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+class P
+{
+    static Result<int, string> Ok(int v) => Result<int, string>.Ok(v);
+    static Result<int, string> Err(string e) => Result<int, string>.Err(e);
+    static Result<int, string> Half(int x) => x % 2 == 0 ? Ok(x / 2) : Err("odd");
+
+    static void Main()
+    {
+        // 1. reading
+        Console.WriteLine(Ok(1).Unwrap());
+        Console.WriteLine(Err("e").UnwrapErr());
+        Console.WriteLine(Ok(2).Expect("needed"));
+        Console.WriteLine(Err("bad").ExpectErr("must fail"));
+        Console.WriteLine(Ok(3).Ok().Unwrap() + " " + Err("x").Ok().IsNone);
+        Console.WriteLine(Err("y").Err().Unwrap() + " " + Ok(4).Err().IsNone);
+        Console.WriteLine(Ok(5).IntoOk() + " " + Err("z").IntoErr());
+
+        // 2. checks
+        var r = Ok(6);
+        Console.WriteLine(r.IsOk + " " + r.IsErr);
+        // IsOkAnd consumes, as in Rust; AsRef keeps the Result.
+        Console.WriteLine(r.AsRef().IsOkAnd(v => v.Value > 5) + " " + r.AsRef().IsOkAnd(v => v.Value > 10));
+        Console.WriteLine(Err("boom").IsErrAnd(e => e.Length == 4));
+        Console.WriteLine(r.Unwrap());
+
+        // 3. transforming
+        Console.WriteLine(Ok(2).Map(v => v * 10));
+        Console.WriteLine(Err("e").MapErr(e => e.Length));
+        Console.WriteLine(Ok(2).MapOr(-1, v => v + 1) + " " + Err("e").MapOr(-1, v => v + 1));
+        Console.WriteLine(Ok(2).MapOrElse(e => e.Length, v => v * 3) + " " + Err("four").MapOrElse(e => e.Length, v => v * 3));
+        mut int seen = 0;
+        var inspected = Ok(7).Inspect((in int v) => { seen = v; });
+        Console.WriteLine(inspected + " " + seen.ToString());
+        mut string logged = "";
+        Console.WriteLine(Err("oops").InspectErr((in string e) => { logged = e; }) + " " + logged);
+
+        // 4. chaining
+        Console.WriteLine(Ok(1).And(Result<string, string>.Ok("next")));
+        Console.WriteLine(Err("first").And(Result<string, string>.Ok("next")));
+        Console.WriteLine(Ok(8).AndThen(Half).AndThen(Half).AndThen(Half));
+        Console.WriteLine(Ok(6).AndThen(Half).AndThen(Half));
+        Console.WriteLine(Ok(1).Or(Result<int, int>.Ok(2)) + " " + Err("e").Or(Result<int, int>.Err(9)));
+        Console.WriteLine(Err("short").OrElse(e => Result<int, int>.Ok(e.Length)));
+
+        // 5. fallbacks
+        Console.WriteLine(Err("e").UnwrapOr(0) + " " + Err("seven").UnwrapOrElse(e => e.Length) + " " + Err("e").UnwrapOrDefault());
+
+        // 6. references and copies
+        var original = Result<List<int>, string>.Ok(new List<int>());
+        mut var copy = original.AsRef().Cloned();
+        copy.Unwrap().Add(1);
+        var three = Ok(3);
+        Console.WriteLine(original.Unwrap().Count + " " + three.AsRef().Copied());
+
+        // 7. nested and iteration
+        Console.WriteLine(Result<Option<int>, string>.Ok(Option<int>.Some(1)).Transpose().Unwrap());
+        Console.WriteLine(Result<Option<int>, string>.Ok(Option<int>.None).Transpose().IsNone);
+        Console.WriteLine(Result<Option<int>, string>.Err("e").Transpose().Unwrap());
+        Console.WriteLine(Result<Result<int, string>, string>.Ok(Ok(5)).Flatten());
+        Console.WriteLine(Result<Result<int, string>, string>.Err("outer").Flatten());
+        var some = Ok(41);
+        foreach (var v in some.Iter()) Console.WriteLine(v + 1);
+        var none = Err("e");
+        Console.WriteLine(none.Iter().Count(x => true) + " " + some.Iter().Sum());
+    }
+}

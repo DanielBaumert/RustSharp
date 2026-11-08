@@ -1,0 +1,13 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    internal unsafe struct Worker
+    {
+        public void* Lock;
+        public void* Ready;
+        public Ring Queue;
+        public int Idle;
+        public int TakesNewTasks;
+    }
+}

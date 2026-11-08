@@ -1,0 +1,73 @@
+namespace System.Linq
+{
+    public static unsafe class Enumerable
+    {
+        public static Query<int, RangeIter> Range(int start, int count)
+            => new Query<int, RangeIter>(new RangeIter(start, count));
+
+        private static SliceIter<T> Slice<T>(in System.Collections.Generic.List<T> list) => new SliceIter<T>(list.Data, list.Count);
+        private static SliceIter<T> Slice<T>(in T[] array) => new SliceIter<T>(array.Length == 0 ? null : Mem.AddressOf(in array[0]), array.Length);
+
+        // Queries start on a collection and borrow it for as long as they live.
+        public static 'a Query<T, SliceIter<T>> AsQuery<T>(this in 'a System.Collections.Generic.List<T> list)
+            => new Query<T, SliceIter<T>>(Slice(in list));
+        public static 'a Query<T, SliceIter<T>> AsQuery<T>(this in 'a T[] array)
+            => new Query<T, SliceIter<T>>(Slice(in array));
+
+        public static 'a Query<T, WhereIter<T, SliceIter<T>>> Where<T>(this in 'a System.Collections.Generic.List<T> list, 'a Predicate<T> keep)
+            => list.AsQuery().Where(keep);
+        public static 'a Query<U, SelectIter<T, U, SliceIter<T>>> Select<T, U>(this in 'a System.Collections.Generic.List<T> list, 'a Selector<T, U> map)
+            => list.AsQuery().Select(map);
+        public static 'a Query<T, WhereIter<T, SliceIter<T>>> Where<T>(this in 'a T[] array, 'a Predicate<T> keep)
+            => array.AsQuery().Where(keep);
+        public static 'a Query<U, SelectIter<T, U, SliceIter<T>>> Select<T, U>(this in 'a T[] array, 'a Selector<T, U> map)
+            => array.AsQuery().Select(map);
+
+        public static 'a Query<T, TakeIter<T, SliceIter<T>>> Take<T>(this in 'a System.Collections.Generic.List<T> c, int n) => c.AsQuery().Take(n);
+        public static 'a Query<T, SkipIter<T, SliceIter<T>>> Skip<T>(this in 'a System.Collections.Generic.List<T> c, int n) => c.AsQuery().Skip(n);
+        public static bool Any<T>(this in 'a System.Collections.Generic.List<T> c, 'a Predicate<T> test) => c.AsQuery().Any(test);
+        public static bool All<T>(this in 'a System.Collections.Generic.List<T> c, 'a Predicate<T> test) => c.AsQuery().All(test);
+        public static int Count<T>(this in 'a System.Collections.Generic.List<T> c, 'a Predicate<T> test) => c.AsQuery().Count(test);
+        public static Option<T> First<T>(this in 'a System.Collections.Generic.List<T> c) => c.AsQuery().First();
+        public static Option<T> Last<T>(this in 'a System.Collections.Generic.List<T> c) => c.AsQuery().Last();
+        public static Option<T> Max<T>(this in 'a System.Collections.Generic.List<T> c) => c.AsQuery().Max();
+        public static Option<T> Min<T>(this in 'a System.Collections.Generic.List<T> c) => c.AsQuery().Min();
+        public static System.Collections.Generic.List<T> ToList<T>(this in 'a System.Collections.Generic.List<T> c) => c.AsQuery().ToList();
+        public static Query<T, OwnedIter<T>> OrderBy<T, K>(this in 'a System.Collections.Generic.List<T> c, 'a Selector<T, K> key) => c.AsQuery().OrderBy(key);
+        public static Query<T, OwnedIter<T>> OrderByDescending<T, K>(this in 'a System.Collections.Generic.List<T> c, 'a Selector<T, K> key) => c.AsQuery().OrderByDescending(key);
+        public static Query<T, OwnedIter<T>> Distinct<T>(this in 'a System.Collections.Generic.List<T> c) => c.AsQuery().Distinct();
+        public static System.Collections.Generic.Dictionary<K, System.Collections.Generic.List<T>> GroupBy<T, K>(this in 'a System.Collections.Generic.List<T> c, 'a Selector<T, K> key) => c.AsQuery().GroupBy(key);
+        public static 'a Query<T, TakeIter<T, SliceIter<T>>> Take<T>(this in 'a T[] c, int n) => c.AsQuery().Take(n);
+        public static 'a Query<T, SkipIter<T, SliceIter<T>>> Skip<T>(this in 'a T[] c, int n) => c.AsQuery().Skip(n);
+        public static bool Any<T>(this in 'a T[] c, 'a Predicate<T> test) => c.AsQuery().Any(test);
+        public static bool All<T>(this in 'a T[] c, 'a Predicate<T> test) => c.AsQuery().All(test);
+        public static int Count<T>(this in 'a T[] c, 'a Predicate<T> test) => c.AsQuery().Count(test);
+        public static Option<T> First<T>(this in 'a T[] c) => c.AsQuery().First();
+        public static Option<T> Last<T>(this in 'a T[] c) => c.AsQuery().Last();
+        public static Option<T> Max<T>(this in 'a T[] c) => c.AsQuery().Max();
+        public static Option<T> Min<T>(this in 'a T[] c) => c.AsQuery().Min();
+        public static System.Collections.Generic.List<T> ToList<T>(this in 'a T[] c) => c.AsQuery().ToList();
+        public static Query<T, OwnedIter<T>> OrderBy<T, K>(this in 'a T[] c, 'a Selector<T, K> key) => c.AsQuery().OrderBy(key);
+        public static Query<T, OwnedIter<T>> OrderByDescending<T, K>(this in 'a T[] c, 'a Selector<T, K> key) => c.AsQuery().OrderByDescending(key);
+        public static Query<T, OwnedIter<T>> Distinct<T>(this in 'a T[] c) => c.AsQuery().Distinct();
+        public static System.Collections.Generic.Dictionary<K, System.Collections.Generic.List<T>> GroupBy<T, K>(this in 'a T[] c, 'a Selector<T, K> key) => c.AsQuery().GroupBy(key);
+        public static int Sum<I>(this Query<int, I> q) where I : IIter<int>, allows ref struct => q.Aggregate(0, (a, in x) => a + x);
+        public static long Sum<I>(this Query<long, I> q) where I : IIter<long>, allows ref struct => q.Aggregate(0L, (a, in x) => a + x);
+        public static double Sum<I>(this Query<double, I> q) where I : IIter<double>, allows ref struct => q.Aggregate(0.0, (a, in x) => a + x);
+        public static decimal Sum<I>(this Query<decimal, I> q) where I : IIter<decimal>, allows ref struct => q.Aggregate(0m, (a, in x) => a + x);
+        public static Option<double> Average<I>(this Query<int, I> q) where I : IIter<int>, allows ref struct
+        {
+            var sum = q.Aggregate((0L, 0), (a, in x) => (a.Item1 + x, a.Item2 + 1));
+            if (sum.Item2 == 0) return Option<double>.None;
+            return Option<double>.Some((double)sum.Item1 / sum.Item2);
+        }
+        public static Option<double> Average<I>(this Query<double, I> q) where I : IIter<double>, allows ref struct
+        {
+            var sum = q.Aggregate((0.0, 0), (a, in x) => (a.Item1 + x, a.Item2 + 1));
+            if (sum.Item2 == 0) return Option<double>.None;
+            return Option<double>.Some(sum.Item1 / sum.Item2);
+        }
+        public static 'a Query<U, SelectManyIter<T, U, I>> SelectMany<T, U, I>(this 'a Query<T, I> q, 'a Selector<T, System.Collections.Generic.List<U>> f) where I : IIter<T>, allows ref struct
+            => new Query<U, SelectManyIter<T, U, I>>(new SelectManyIter<T, U, I>(q.Inner(), f));
+    }
+}

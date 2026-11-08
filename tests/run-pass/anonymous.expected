@@ -1,0 +1,12 @@
+1
+text
+text
+{ A = 1, B = text, D = 2.5 }
+4
+{ Inner = { X = 4 }, Name = n }
+2
+6
+2
+1
+end
+drop c

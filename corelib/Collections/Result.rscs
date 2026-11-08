@@ -1,0 +1,138 @@
+namespace System
+{
+    [CarriesBorrows]
+    public struct Result<T, E>
+    {
+        // Rust's enum Result { Ok(T), Err(E) }: exactly one of the two is Some. Only an Option holds the
+        // missing side, so no zeroed T or E ever stands in for a value.
+        private Option<T> _v;
+        private Option<E> _e;
+        private Result(Option<T> v, Option<E> e) { _v = v; _e = e; }
+        private readonly bool _ok => _v.IsSome;
+
+        public static Result<T, E> Ok(T value) => new Result<T, E>(Option<T>.Some(value), Option<E>.None);
+        public static Result<T, E> Err(E error) => new Result<T, E>(Option<T>.None, Option<E>.Some(error));
+
+        public readonly bool IsOk => _ok;
+        public readonly bool IsErr => !_ok;
+
+        public move T Unwrap()
+        {
+            if (!_ok) Panic.Raise("called `Result::unwrap()` on an `Err` value: " + _e.Slot.ToString());
+            return _v.Unwrap();
+        }
+
+        public move T Expect(string message)
+        {
+            if (!_ok) Panic.Raise(message + ": " + _e.Slot.ToString());
+            return _v.Unwrap();
+        }
+
+        public move E UnwrapErr()
+        {
+            if (_ok) Panic.Raise("called `Result::unwrap_err()` on an `Ok` value");
+            return _e.Unwrap();
+        }
+
+        // ---- reading the value (unwrap, expect, ok, err)
+
+        public move E ExpectErr(string message)
+        {
+            if (_ok) Panic.Raise(message + ": " + _v.Slot.ToString());
+            return _e.Unwrap();
+        }
+
+        /// <summary>Rust's ok(): the value as an Option, dropping the error.</summary>
+        public move Option<T> Ok() => _ok ? Option<T>.Some(_v.Unwrap()) : Option<T>.None;
+
+        /// <summary>Rust's err(): the error as an Option, dropping the value.</summary>
+        public move Option<E> Err() => _ok ? Option<E>.None : Option<E>.Some(_e.Unwrap());
+
+        /// <summary>For a Result that cannot be Err. Panics otherwise, like Unwrap.</summary>
+        public move T IntoOk()
+        {
+            if (!_ok) Panic.Raise("called `Result::into_ok()` on an `Err` value: " + _e.Slot.ToString());
+            return _v.Unwrap();
+        }
+
+        /// <summary>For a Result that cannot be Ok. Panics otherwise, like UnwrapErr.</summary>
+        public move E IntoErr()
+        {
+            if (_ok) Panic.Raise("called `Result::into_err()` on an `Ok` value");
+            return _e.Unwrap();
+        }
+
+        // ---- checks. Like Rust they consume the Result; AsRef first keeps it: `r.AsRef().IsOkAnd(...)`.
+
+        public move bool IsOkAnd(Func<T, bool> f) => _ok && f(_v.Unwrap());
+        public move bool IsErrAnd(Func<E, bool> f) => !_ok && f(_e.Unwrap());
+
+        // ---- references: Rust's as_ref() and as_mut()
+
+        /// <summary>Result&lt;Ref&lt;T&gt;, Ref&lt;E&gt;&gt;: looks into the Result without taking anything out.</summary>
+        public readonly Result<Ref<T>, Ref<E>> AsRef()
+            => _ok ? Result<Ref<T>, Ref<E>>.Ok(Ref<T>.Of(in _v.Slot)) : Result<Ref<T>, Ref<E>>.Err(Ref<E>.Of(in _e.Slot));
+
+        /// <summary>Result&lt;RefMut&lt;T&gt;, RefMut&lt;E&gt;&gt;: changes the value or the error in place.</summary>
+        public Result<RefMut<T>, RefMut<E>> AsMut()
+            => _ok ? Result<RefMut<T>, RefMut<E>>.Ok(RefMut<T>.Of(ref _v.SlotMut)) : Result<RefMut<T>, RefMut<E>>.Err(RefMut<E>.Of(ref _e.SlotMut));
+
+        internal readonly unsafe ref readonly T OkSlot => ref *Mem.AddressOf(in _v.Slot);
+        internal readonly unsafe ref readonly E ErrSlot => ref *Mem.AddressOf(in _e.Slot);
+        internal unsafe ref T OkSlotMut => ref *Mem.AddressOf(in _v.Slot);
+        internal unsafe ref E ErrSlotMut => ref *Mem.AddressOf(in _e.Slot);
+
+        // ---- transforming
+
+        public move Result<U, E> Map<U>(Func<T, U> f) => _ok ? Result<U, E>.Ok(f(_v.Unwrap())) : Result<U, E>.Err(_e.Unwrap());
+        public move Result<T, F> MapErr<F>(Func<E, F> f) => _ok ? Result<T, F>.Ok(_v.Unwrap()) : Result<T, F>.Err(f(_e.Unwrap()));
+        public move U MapOr<U>(U fallback, Func<T, U> f) => _ok ? f(_v.Unwrap()) : fallback;
+        public move U MapOrElse<U>(Func<E, U> fallback, Func<T, U> f) => _ok ? f(_v.Unwrap()) : fallback(_e.Unwrap());
+
+        /// <summary>Looks at the value without changing it, then passes the Result on.</summary>
+        public move Result<T, E> Inspect(System.Linq.Visitor<T> f)
+        {
+            if (_ok)
+            {
+                f(in _v.Slot);
+                return Result<T, E>.Ok(_v.Unwrap());
+            }
+            return Result<T, E>.Err(_e.Unwrap());
+        }
+
+        public move Result<T, E> InspectErr(System.Linq.Visitor<E> f)
+        {
+            if (_ok) return Result<T, E>.Ok(_v.Unwrap());
+            f(in _e.Slot);
+            return Result<T, E>.Err(_e.Unwrap());
+        }
+
+        // ---- chaining
+
+        /// <summary>The other Result if this one is Ok, otherwise this error.</summary>
+        public move Result<U, E> And<U>(Result<U, E> other) => _ok ? other : Result<U, E>.Err(_e.Unwrap());
+        public move Result<U, E> AndThen<U>(Func<T, Result<U, E>> f) => _ok ? f(_v.Unwrap()) : Result<U, E>.Err(_e.Unwrap());
+
+        /// <summary>This value if Ok, otherwise the other Result.</summary>
+        public move Result<T, F> Or<F>(Result<T, F> other) => _ok ? Result<T, F>.Ok(_v.Unwrap()) : other;
+        public move Result<T, F> OrElse<F>(Func<E, Result<T, F>> f) => _ok ? Result<T, F>.Ok(_v.Unwrap()) : f(_e.Unwrap());
+
+        // ---- fallbacks
+
+        public move T UnwrapOr(T fallback) => _ok ? _v.Unwrap() : fallback;
+        public move T UnwrapOrElse(Func<E, T> f) => _ok ? _v.Unwrap() : f(_e.Unwrap());
+
+        // UnwrapOrDefault needs `T : IDefault<T>`: see ResultExtensions.
+
+        // ---- iteration
+
+        /// <summary>Zero or one element that foreach may change: `foreach (ref var v in r.IterMut())`.</summary>
+        public unsafe OnceMut<T> IterMut() => new OnceMut<T>(_ok ? Mem.AddressOf(in _v.Slot) : null);
+
+        /// <summary>Zero or one element: the Ok value. It works with foreach and with LINQ.</summary>
+        public unsafe readonly System.Linq.Query<T, System.Linq.SliceIter<T>> Iter()
+            => new System.Linq.Query<T, System.Linq.SliceIter<T>>(new System.Linq.SliceIter<T>(_ok ? Mem.AddressOf(in _v.Slot) : null, _ok ? 1 : 0));
+
+        public override readonly string ToString() => _ok ? "Ok(" + _v.Slot.ToString() + ")" : "Err(" + _e.Slot.ToString() + ")";
+    }
+}

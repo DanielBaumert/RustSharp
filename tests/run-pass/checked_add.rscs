@@ -1,0 +1,12 @@
+// exit: 101
+using System;
+class P
+{
+    static void Main()
+    {
+        int a = int.MaxValue;
+        Console.WriteLine("before");
+        int b = checked(a + 1);
+        Console.WriteLine(b);
+    }
+}

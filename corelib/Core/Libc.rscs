@@ -1,0 +1,17 @@
+namespace System
+{
+    internal static unsafe class Libc
+    {
+        [System.Runtime.InteropServices.DllImport("c")] public static extern void* calloc(long n, long size);
+        [System.Runtime.InteropServices.DllImport("c")] public static extern void* malloc(long size);
+        [System.Runtime.InteropServices.DllImport("c")] public static extern void* realloc(void* p, long size);
+        [System.Runtime.InteropServices.DllImport("c")] public static extern void free(void* p);
+        [System.Runtime.InteropServices.DllImport("c")] public static extern long write(int fd, void* p, long n);
+        [System.Runtime.InteropServices.DllImport("c")] public static extern long read(int fd, void* p, long n);
+        [System.Runtime.InteropServices.DllImport("c")] public static extern void* memcpy(void* d, void* s, long n);
+        [System.Runtime.InteropServices.DllImport("c")] public static extern int memcmp(void* a, void* b, long n);
+        [System.Runtime.InteropServices.DllImport("c")] public static extern byte* gcvt(double x, int digits, byte* buf);
+        [System.Runtime.InteropServices.DllImport("c")] public static extern long strlen(byte* s);
+        [System.Runtime.InteropServices.DllImport("c")] public static extern void exit(int code);
+    }
+}

@@ -1,0 +1,17 @@
+using System;
+struct Plain { public int X; public override readonly string ToString() => "Plain" + X.ToString(); }
+struct Gen<T> { public T V; public override readonly string ToString() => "Gen(" + V.ToString() + ")"; }
+class P
+{
+    static void Main()
+    {
+        var p = new Plain { X = 1 };
+        Console.WriteLine(p + "!");
+        var g = new Gen<int> { V = 2 };
+        Console.WriteLine(g + "!");
+        object o = g;
+        Console.WriteLine(o.ToString());
+        Console.WriteLine(5 + "!");
+        Console.WriteLine(Result<int, string>.Ok(3) + "!");
+    }
+}

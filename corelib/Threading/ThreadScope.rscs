@@ -1,0 +1,58 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    /// <summary>
+    /// Rust's `thread::scope`: threads that may borrow local variables, because the scope waits for all
+    /// of them when it ends. It is a ref struct, so it cannot be leaked to skip that wait.
+    /// </summary>
+    public unsafe ref struct ThreadScope
+    {
+        private ScopedPacket** _threads;
+        private int _count;
+        private int _capacity;
+
+        internal void Start(ScopedWork work)
+        {
+            if (_count == _capacity)
+            {
+                _capacity = _capacity == 0 ? 8 : _capacity * 2;
+                _threads = (ScopedPacket**)Libc.realloc(_threads, (long)_capacity * 8);
+            }
+            var p = (ScopedPacket*)Libc.calloc(1, Mem.SizeOf<ScopedPacket>());
+            Mem.Write(Mem.AddressOf(in p->Work), Option<ScopedWork>.Some(Mem.Transmute<ScopedWork, ScopedWork>(work)));
+            ulong id;
+            Pthread.pthread_create(&id, null, &ScopedPacket.Entry, p);
+            p->Id = id;
+            _threads[_count++] = p;
+        }
+
+        /// <summary>Waits for all threads. An exception of one of them is rethrown here.</summary>
+        public void Join()
+        {
+            bool panicked = false;
+            for (int i = 0; i < _count; i++)
+            {
+                ScopedPacket* p = _threads[i];
+                Pthread.pthread_join(p->Id, null);
+                panicked |= p->Error.IsSome;
+                Mem.DropInPlace(p);
+                Libc.free(p);
+            }
+            _count = 0;
+            if (panicked) Panic.Raise("a scoped thread panicked");
+        }
+
+        ~ThreadScope()
+        {
+            for (int i = 0; i < _count; i++)
+            {
+                ScopedPacket* p = _threads[i];
+                Pthread.pthread_join(p->Id, null);
+                Mem.DropInPlace(p);
+                Libc.free(p);
+            }
+            Libc.free(_threads);
+        }
+    }
+}

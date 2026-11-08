@@ -1,0 +1,30 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    /// <summary>Lets a fixed number of threads meet at a point.</summary>
+    [SendWhen(Bound.Always), SyncWhen(Bound.Always)]
+    public class Barrier
+    {
+        private Mutex<long> _arrived = new Mutex<long>(0);
+        private Condvar _ready = new Condvar();
+        private int _parties;
+        public Barrier(int parties) { _parties = parties; }
+
+        /// <summary>Waits for the others; true for the thread that arrived last.</summary>
+        public readonly bool Wait()
+        {
+            var g = _arrived.Lock();
+            long ticket = g.Value;
+            g.Value = ticket + 1;
+            long round = ticket / _parties;
+            if ((ticket + 1) % _parties == 0)
+            {
+                _ready.NotifyAll();
+                return true;
+            }
+            while (g.Value / _parties == round) _ready.Wait(ref g);
+            return false;
+        }
+    }
+}

@@ -1,0 +1,31 @@
+2 20 7 70
+ss
+custom clone
+2
+5x
+23
+m
+3
+Point { X = 2, Name = a }
+True
+True
+False
+True
+a1
+a
+Line { A = Point { X = 0, Name = p }, B = Point { X = 3, Name = q } }
+True
+3
+Size { W = 2, H = 3 }
+7
+True
+Dog { Name = rex, Age = 3 }
+True
+9
+True
+end
+drop t
+drop a2
+drop b2
+drop a
+drop b

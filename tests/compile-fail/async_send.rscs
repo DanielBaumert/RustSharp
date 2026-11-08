@@ -1,0 +1,11 @@
+using System;
+using System.Threading.Tasks;
+class P
+{
+    static void Main()
+    {
+        var rc = new Rc<int>(1);
+        var t = Task.Run(move () => Holder(rc)); // error: CS9923
+    }
+    static async Task<int> Holder(Rc<int> r) { await Task.Yield(); return 1; }
+}

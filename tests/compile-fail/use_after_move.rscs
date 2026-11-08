@@ -1,0 +1,20 @@
+using System;
+class C { public int V; public void M() { } }
+class P
+{
+    static void Take(C c) { }
+    static void Main()
+    {
+        mut var a = new C();
+        var b = a;
+        a.M(); // error: CS9901
+        var c = new C();
+        Take(c);
+        Console.WriteLine(c.V); // error: CS9900
+        var d = new C();
+        for (mut int i = 0; i < 2; i++) Take(d); // error: CS9900
+        mut var e = new C();
+        if (b.V > 0) Take(e);
+        e.M(); // error: CS9901
+    }
+}

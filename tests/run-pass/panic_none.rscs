@@ -1,0 +1,14 @@
+using System;
+// exit: 101
+// Rust's unwrap on None: an explicit panic, never a null dereference.
+class P
+{
+    static string? Lookup(int id) => id == 1 ? Some("one") : None;
+
+    static void Main()
+    {
+        Console.WriteLine(Lookup(1).Unwrap());
+        Console.WriteLine("before");
+        Console.WriteLine(Lookup(2).Unwrap());
+    }
+}

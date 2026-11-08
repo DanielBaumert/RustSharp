@@ -1,0 +1,22 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>A lazy future with a result.</summary>
+    public unsafe class Task<T> : Task
+    {
+        internal Option<T> _result = Option<T>.None;
+
+        internal Task() { }
+
+        public static Task<T> FromCoroutine(void* frame, delegate*<void*, void*, int> resume, delegate*<void*, void> drop)
+            => new CoroutineTask<T>(frame, resume, drop);
+
+        internal T TakeResult()
+        {
+            return _result.Take().Expect("the task has no result: it is not finished, or the result was taken");
+        }
+
+        public new move TaskAwaiter<T> GetAwaiter() => new TaskAwaiter<T>(this);
+    }
+}

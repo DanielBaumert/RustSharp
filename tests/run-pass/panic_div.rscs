@@ -1,0 +1,17 @@
+using System;
+// exit: 101
+class R { string _n; public R(string n) { _n = n; } ~R() { Console.WriteLine("drop " + _n); } }
+class P
+{
+    static int Divide(int a, int b)
+    {
+        var r = new R("frame");
+        return a / b;
+    }
+    static void Main()
+    {
+        var outer = new R("main");
+        Console.WriteLine(Divide(6, 3));
+        Console.WriteLine(Divide(1, 0));
+    }
+}

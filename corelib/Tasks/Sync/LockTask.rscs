@@ -1,0 +1,19 @@
+using System.Collections.Generic;
+using System.Threading;
+
+namespace System.Threading.Tasks
+{
+    internal sealed unsafe class LockTask<T> : Task<AsyncGuard<T>>
+    {
+        private WaitState* _s;
+        private Arc<Mutex<T>> _value;
+        public LockTask(WaitState* s, Arc<Mutex<T>> value) { _s = WaitState.Retain(s); _value = value; }
+        ~LockTask() { WaitState.Release(_s); }
+        internal override bool PollCore()
+        {
+            if (!WaitState.TryAcquire(_s)) return false;
+            _result = Some(new AsyncGuard<T>(WaitState.Retain(_s), _value.Clone()));
+            return true;
+        }
+    }
+}

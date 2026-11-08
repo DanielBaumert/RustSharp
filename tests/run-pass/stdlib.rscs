@@ -1,0 +1,191 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+record Key(int A, string B);
+[Eq] class Point { public int X, Y; public Point(int x, int y) { X = x; Y = y; } }
+class Caseless : IEq<Caseless>, IHash
+{
+    public string S;
+    public Caseless(string s) { S = s; }
+    public readonly bool Eq(in Caseless other) => S.Length == other.S.Length;
+    public readonly int Hash() => S.Length;
+}
+struct Version : IOrd<Version>
+{
+    public int Major;
+    public Version(int m) { Major = m; }
+    public readonly int Compare(in Version other) => other.Major - Major; // descending on purpose
+}
+class Item { public int V; public string N; public Item(int v, string n) { V = v; N = n; } }
+class Tree { public Weak<Tree> Parent; public int V; public Tree(int v) { V = v; } }
+class P
+{
+    static Option<int> Half(int x) => x % 2 == 0 ? Option<int>.Some(x / 2) : Option<int>.None;
+    static Result<int, string> Parse(string s)
+    {
+        if (s.Length == 0) return Result<int, string>.Err("empty");
+        return Result<int, string>.Ok(int.Parse(s).Unwrap());
+    }
+    static void Main()
+    {
+        // Option and Result
+        Console.WriteLine(Half(10).Map(x => x + 1).Unwrap());
+        Console.WriteLine(Half(3).UnwrapOr(-1));
+        Console.WriteLine(Half(8).AndThen(Half).AndThen(Half).Unwrap());
+        Console.WriteLine(Half(3).ToString() + Half(4).ToString());
+        Console.WriteLine(Parse("12").Map(x => x * 2).Unwrap());
+        Console.WriteLine(Parse("").UnwrapErr());
+        Console.WriteLine(Parse("").ToString());
+        Console.WriteLine(Parse("5").Ok().IsSome);
+
+        // Dictionary
+        mut var d = new Dictionary<string, int>();
+        d.Add("one", 1);
+        d.Set("two", 2);
+        d["one"] = 10;
+        Console.WriteLine(d.Get("one").Unwrap().Value + d.Get("two").Unwrap().Value);
+        Console.WriteLine(d.Remove("two").Unwrap());
+        Console.WriteLine(d.ContainsKey("two"));
+        for (mut int i = 0; i < 200; i++) d.Set("k" + i.ToString(), i);
+        for (mut int i = 0; i < 200; i += 2) d.Remove("k" + i.ToString());
+        Console.WriteLine(d.Count);
+        mut int total = 0;
+        foreach (ref readonly var e in d) total += e.Value;
+        Console.WriteLine(total);
+        mut var byRecord = new Dictionary<Key, int>();
+        byRecord.Set(new Key(1, "a"), 5);
+        Console.WriteLine(byRecord.Get(new Key(1, "a")).Unwrap().Value);
+        mut var byPoint = new Dictionary<Point, string>();
+        byPoint.Set(new Point(1, 2), "p");
+        Console.WriteLine(byPoint.ContainsKey(new Point(1, 2)));
+        mut var custom = new HashSet<Caseless>();
+        custom.Add(new Caseless("ab"));
+        Console.WriteLine(custom.Add(new Caseless("xy")));
+        Console.WriteLine(custom.Add(new Caseless("xyz")));
+
+        // Queue, Stack, SortedDictionary
+        mut var q = new Queue<string>();
+        for (mut int i = 0; i < 20; i++) q.Enqueue(i.ToString());
+        q.Dequeue();
+        Console.WriteLine(q.Dequeue().Unwrap() + q.Peek());
+        mut var st = new Stack<int>();
+        st.Push(1);
+        st.Push(2);
+        Console.WriteLine(st.Pop().Unwrap() * 10 + st.Peek());
+        mut var sorted = new SortedDictionary<int, string>();
+        sorted.Set(3, "c");
+        sorted.Set(1, "a");
+        sorted.Set(2, "b");
+        foreach (ref readonly var e in sorted) Console.Write(e.Value);
+        Console.WriteLine();
+        sorted.Remove(2);
+        Console.WriteLine(sorted.Count);
+
+        // Sort uses IOrd
+        mut var vs = new List<Version> { new Version(1), new Version(3), new Version(2) };
+        vs.Sort();
+        Console.WriteLine(vs[0].Major);
+
+        // LINQ
+        var items = new List<Item> { new Item(3, "c"), new Item(1, "a"), new Item(2, "b"), new Item(1, "z") };
+        var names = new List<string> { "bob", "ada", "cyd", "ada" };
+        foreach (var n in names.OrderBy(s => s).Distinct()) Console.Write(n + " ");
+        Console.WriteLine();
+        var nums = new List<int> { 5, 3, 8, 1 };
+        Console.WriteLine(nums.OrderByDescending(x => x).First().Unwrap());
+        Console.WriteLine(nums.Max().Unwrap() - nums.Min().Unwrap());
+        Console.WriteLine(nums.AsQuery().Average().Unwrap());
+        Console.WriteLine(nums.AsQuery().Reverse().First().Unwrap());
+        Console.WriteLine(nums.AsQuery().TakeWhile(x => x != 8).Count());
+        Console.WriteLine(nums.AsQuery().SkipWhile(x => x != 8).First().Unwrap());
+        Console.WriteLine(nums.AsQuery().Concat(nums.AsQuery()).Count());
+        foreach (ref readonly var p in nums.AsQuery().Zip(names.AsQuery())) Console.Write(p.Item2 + p.Item1.ToString() + " ");
+        Console.WriteLine();
+        var groups = names.GroupBy(s => s.Chars().First().Unwrap());
+        Console.WriteLine(groups.Get('a').Unwrap().Value.Count);
+        Console.WriteLine(names.AsQuery().ToHashSet().Count);
+        Console.WriteLine(nums.AsQuery().ToDictionary(x => x * 2).Get(10).Unwrap().Value);
+        Console.WriteLine(nums.AsQuery().Contains(in nums.At(1)));
+        Console.WriteLine(nums.Any(x => x > 7));
+        Console.WriteLine(nums.Count(x => x > 2));
+        var wide = new List<int> { 1, 2 };
+        Console.WriteLine(wide.AsQuery().SelectMany(x => new List<int> { x, x * 10 }).Sum());
+
+        // Weak breaks cycles
+        var parent = new Rc<Tree>(new Tree(1));
+        mut var child = new Tree(2);
+        child.Parent = parent.Downgrade();
+        Console.WriteLine(child.Parent.Upgrade().Unwrap().Value.V);
+        Console.WriteLine(parent.Count);
+        Console.WriteLine(parent.WeakCount);
+        Mem.Drop(parent);
+        Console.WriteLine(child.Parent.Upgrade().IsNone);
+
+        var arc = new Arc<int>(4);
+        var weak = arc.Downgrade();
+        Console.WriteLine(weak.Upgrade().Unwrap().Value);
+        Mem.Drop(arc);
+        Console.WriteLine(weak.Upgrade().IsNone);
+
+        // Cell and RefCell
+        var cell = new Cell<int>(1);
+        Bump(in cell);
+        Console.WriteLine(cell.Get());
+        var rc = new RefCell<int>(1);
+        var r1 = rc.Borrow();
+        var r2 = rc.Borrow();
+        Console.WriteLine(r1.Value + r2.Value);
+        Console.WriteLine(rc.CanBorrowMut ? "free" : "already borrowed");
+
+        // RwLock, Condvar, Barrier, Lazy, scoped threads
+        var rw = new Arc<RwLock<int>>(new RwLock<int>(1));
+        {
+            mut var w = rw.Value.Write();
+            w.Value = 2;
+        }
+        Console.WriteLine(rw.Value.Read().Value);
+
+        var pair = new Arc<Mutex<bool>>(new Mutex<bool>(false));
+        var cond = new Arc<Condvar>(new Condvar());
+        var pc = pair.Clone();
+        var cc = cond.Clone();
+        mut var waiter = Thread.Run(move () =>
+        {
+            mut var g = pc.Value.Lock();
+            while (!g.Value) cc.Value.Wait(ref g);
+            return 1;
+        });
+        {
+            mut var g = pair.Value.Lock();
+            g.Value = true;
+            cond.Value.NotifyAll();
+        }
+        Console.WriteLine(waiter.Join().Unwrap());
+
+        var barrier = new Arc<Barrier>(new Barrier(3));
+        mut var ts = new List<Thread<int>>();
+        for (mut int i = 0; i < 3; i++)
+        {
+            var b = barrier.Clone();
+            ts.Add(Thread.Run(move () => b.Value.Wait() ? 1 : 0));
+        }
+        mut int leaders = 0;
+        while (ts.Count > 0) leaders += ts.RemoveAt(0).Join().Unwrap();
+        Console.WriteLine(leaders);
+
+        var lazy = new Lazy<string>(move () => "computed");
+        Console.WriteLine(lazy.Value);
+        Console.WriteLine(lazy.Value);
+
+        int[] data = { 1, 2, 3, 4 };
+        mut int left = 0, right = 0;
+        {
+            mut var scope = new ThreadScope();
+            scope.Run(() => { left = data[0] + data[1]; });
+            scope.Run(() => { right = data[2] + data[3]; });
+        }
+        Console.WriteLine(left * 10 + right);
+    }
+    static void Bump(in Cell<int> c) { c.Set(c.Get() + 1); }
+}

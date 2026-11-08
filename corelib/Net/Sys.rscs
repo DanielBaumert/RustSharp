@@ -1,0 +1,35 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    internal static unsafe class Sys
+    {
+        public const int EAGAIN = 11, EINTR = 4, EINPROGRESS = 115;
+        [DllImport("c")] public static extern int* __errno_location();
+        [DllImport("c")] public static extern int socket(int domain, int type, int protocol);
+        [DllImport("c")] public static extern int bind(int fd, void* addr, uint len);
+        [DllImport("c")] public static extern int listen(int fd, int backlog);
+        [DllImport("c")] public static extern int accept4(int fd, void* addr, void* len, int flags);
+        [DllImport("c")] public static extern int connect(int fd, void* addr, uint len);
+        [DllImport("c")] public static extern long recv(int fd, void* p, long n, int flags);
+        [DllImport("c")] public static extern long send(int fd, void* p, long n, int flags);
+        [DllImport("c")] public static extern int close(int fd);
+        [DllImport("c")] public static extern int shutdown(int fd, int how);
+        [DllImport("c")] public static extern int setsockopt(int fd, int level, int name, void* value, uint len);
+        [DllImport("c")] public static extern int getsockopt(int fd, int level, int name, void* value, uint* len);
+        [DllImport("c")] public static extern int getsockname(int fd, void* addr, uint* len);
+        [DllImport("c")] public static extern int epoll_create1(int flags);
+        [DllImport("c")] public static extern int epoll_ctl(int epoll, int op, int fd, void* ev);
+        [DllImport("c")] public static extern int epoll_wait(int epoll, void* events, int max, int timeout);
+        [DllImport("c")] public static extern int eventfd(uint value, int flags);
+        [DllImport("c")] public static extern int poll(void* fds, ulong count, int timeout);
+        [DllImport("c")] public static extern long read(int fd, void* p, long n);
+        [DllImport("c")] public static extern long write(int fd, void* p, long n);
+
+        public static int Errno => *__errno_location();
+    }
+}

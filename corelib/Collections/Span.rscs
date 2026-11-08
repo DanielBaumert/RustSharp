@@ -1,0 +1,41 @@
+namespace System
+{
+    /// <summary>A borrowed view of memory. Mutable access, so it is not Copy.</summary>
+    public unsafe ref struct Span<T>
+    {
+        private T* _p;
+        private int _length;
+
+        public Span(ref T first, int length) { _p = Mem.AddressOf(in first); _length = length; }
+        public Span(ref T[] array)
+        {
+            _length = array.Length;
+            _p = _length == 0 ? null : Mem.AddressOf(in array[0]);
+        }
+        public Span(void* p, int length) { _p = (T*)p; _length = length; }
+        internal Span(T* p, int length) { _p = p; _length = length; }
+
+        public readonly int Length => _length;
+
+        public ref T this[int i]
+        {
+            get
+            {
+                if ((uint)i >= (uint)_length) Panic.Raise("index out of bounds: the len is " + _length.ToString() + " but the index is " + i.ToString());
+                return ref *(_p + i);
+            }
+        }
+
+        public Enumerator GetEnumerator() => new Enumerator(_p, _length);
+
+        public ref struct Enumerator
+        {
+            private T* _p;
+            private int _i;
+            private int _n;
+            internal Enumerator(T* p, int n) { _p = p; _i = -1; _n = n; }
+            public bool MoveNext() { _i++; return _i < _n; }
+            public ref T Current { get => ref *(_p + _i); }
+        }
+    }
+}

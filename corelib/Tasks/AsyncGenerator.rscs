@@ -1,0 +1,38 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>What an async iterator returns: a coroutine that can both wait and hand out values.</summary>
+    public sealed unsafe class AsyncGenerator<T> : System.Collections.Generic.IAsyncEnumerable<T>, System.Collections.Generic.IAsyncEnumerator<T>
+    {
+        internal void* _frame;
+        internal delegate*<void*, void*, int> _resume;
+        private delegate*<void*, void> _drop;
+        internal Option<T> _current = Option<T>.None;
+        internal bool _finished;
+
+        private AsyncGenerator() { }
+
+        public static AsyncGenerator<T> FromCoroutine(void* frame, delegate*<void*, void*, int> resume, delegate*<void*, void> drop)
+        {
+            var g = new AsyncGenerator<T>();
+            g._frame = frame;
+            g._resume = resume;
+            g._drop = drop;
+            return g;
+        }
+
+        ~AsyncGenerator() { _drop(_frame); }
+
+        public move System.Collections.Generic.IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken token = default) => this;
+
+        public ValueTask<bool> MoveNextAsync() => new ValueTask<bool>(new AsyncStep<T>(_frame, _resume, Mem.AddressOf(in _current), Mem.AddressOf(in _finished)));
+
+        public T Current
+        {
+            get => Mem.AsRef(Mem.AddressOf(in _current)).Take().Expect("Current read twice, or before MoveNextAsync");
+        }
+
+        public ValueTask DisposeAsync() => new ValueTask(Task.CompletedTask);
+    }
+}

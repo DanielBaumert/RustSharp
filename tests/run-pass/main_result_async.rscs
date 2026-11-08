@@ -1,0 +1,14 @@
+using System;
+using System.IO;
+using System.Threading.Tasks;
+// exit: 1
+class P
+{
+    static async Task<Result<Unit, IoError>> Main()
+    {
+        await Task.Yield();
+        string text = (await File.ReadAllTextAsync("/nonexistent/config.txt"))?;
+        Console.WriteLine(text);
+        return Result<Unit, IoError>.Ok(default);
+    }
+}

@@ -1,0 +1,10 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    public static unsafe class ThreadScopeExtensions
+    {
+        /// <summary>Starts a thread that may borrow whatever outlives the scope.</summary>
+        public static void Run(this ref 'a ThreadScope scope, 'a ScopedWork work) { scope.Start(work); }
+    }
+}

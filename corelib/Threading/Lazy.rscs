@@ -1,0 +1,29 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    /// <summary>A value computed once, on first use: Rust's OnceLock.</summary>
+    [SendWhen(Bound.Send), SyncWhen(Bound.Send | Bound.Sync)]
+    public unsafe class Lazy<T>
+    {
+        private Mutex<int> _gate = new Mutex<int>(0);
+        private Option<ThreadWork<T>> _init;
+        private Option<T> _value = Option<T>.None;
+        public Lazy('static ThreadWork<T> init) { _init = Option<ThreadWork<T>>.Some(init); }
+
+        public readonly ref readonly T Value
+        {
+            get
+            {
+                var g = _gate.Lock();
+                if (g.Value == 0)
+                {
+                    g.Value = 1;
+                    ThreadWork<T> init = Mem.AsRef(Mem.AddressOf(in _init)).Take().Unwrap();
+                    Mem.AsRef(Mem.AddressOf(in _value)) = Option<T>.Some(init());
+                }
+                return ref _value.Slot;
+            }
+        }
+    }
+}

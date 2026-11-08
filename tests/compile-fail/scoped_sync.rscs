@@ -1,0 +1,11 @@
+using System;
+using System.Threading;
+class P
+{
+    static void Main()
+    {
+        var rc = new Rc<int>(1);
+        mut var scope = new ThreadScope();
+        scope.Run(() => { long c = rc.Count; }); // error: CS9924
+    }
+}

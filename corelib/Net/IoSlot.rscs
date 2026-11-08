@@ -1,0 +1,24 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    internal unsafe struct IoSlot
+    {
+        public Option<Waker> Read;   // zeroed memory is None: the slots are calloc'd
+        public Option<Waker> Write;
+        public int Registered;
+        public int ReadReady;
+        public int WriteReady;
+    }
+
+    internal struct TimerEntry
+    {
+        public long Deadline;
+        public Waker Waker;
+        public Arc<AtomicInt> Fired;
+    }
+}

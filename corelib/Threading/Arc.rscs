@@ -1,0 +1,44 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    /// <summary>Atomically reference counted shared ownership: Rust's Arc.</summary>
+    [SendWhen(Bound.Send | Bound.Sync), SyncWhen(Bound.Send | Bound.Sync)]
+    public unsafe struct Arc<T> : IClone<Arc<T>>
+    {
+        private ArcBox<T>* _p;
+
+        public Arc(T value)
+        {
+            _p = (ArcBox<T>*)Libc.malloc(Mem.SizeOf<ArcBox<T>>());
+            _p->Strong = 1;
+            _p->Weak = 1; // all strong references together hold one weak reference
+            Mem.Write(Mem.AddressOf(in _p->Value), value);
+        }
+
+        internal Arc(ArcBox<T>* p) { _p = p; }
+
+        public readonly Arc<T> Clone()
+        {
+            Atomic.Add(Mem.AddressOf(in _p->Strong), 1L);
+            return new Arc<T>(_p);
+        }
+
+        public readonly long Count => Atomic.Load(Mem.AddressOf(in _p->Strong));
+        public readonly ref readonly T Value => ref _p->Value;
+
+        public readonly WeakArc<T> Downgrade()
+        {
+            Atomic.Add(Mem.AddressOf(in _p->Weak), 1L);
+            return new WeakArc<T>(_p);
+        }
+
+        ~Arc()
+        {
+            if (_p == null) return;
+            if (Atomic.Add(Mem.AddressOf(in _p->Strong), -1L) != 1) return;
+            Mem.DropInPlace(Mem.AddressOf(in _p->Value));
+            if (Atomic.Add(Mem.AddressOf(in _p->Weak), -1L) == 1) Libc.free(_p);
+        }
+    }
+}

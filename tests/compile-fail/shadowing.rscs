@@ -1,0 +1,16 @@
+using System;
+class P
+{
+    static void Main()
+    {
+        var s = "a".ToString();
+        var s = s.Length;          // the old s is moved? no: s.Length only reads it
+        Console.WriteLine(s + 1);
+        var t = "t".ToString();
+        var u = t;
+        var t = 3;                 // a new t; the old one was moved, which is fine
+        Console.WriteLine(t + u.Length);
+        var x = 1;
+        x = 2; // error: CS9928
+    }
+}

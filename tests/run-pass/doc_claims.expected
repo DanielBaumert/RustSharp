@@ -1,0 +1,11 @@
+~Base
+field base
+guard 1
+after guard
+7
+True
+10
+3
+True
+drop A
+end

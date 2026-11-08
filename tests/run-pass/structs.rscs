@@ -1,0 +1,50 @@
+using System;
+[Copy] struct Point
+{
+    public int X, Y;
+    public Point(int x, int y) { X = x; Y = y; }
+    public readonly int Sum() => X + Y;
+    public void Shift(int d) { X += d; Y += d; }
+}
+struct Handle
+{
+    int _id;
+    public Handle(int id) { _id = id; Console.WriteLine("open " + id.ToString()); }
+    ~Handle() { Console.WriteLine("close " + _id.ToString()); }
+    public readonly int Id => _id;
+}
+class P
+{
+    static void Bump(ref int x) { x++; }
+    static void Set(out int x) { x = 9; }
+    static int Read(in Point p) => p.X * 10 + p.Y;
+    static void Swap(ref Point a, ref Point b) { Mem.Swap(ref a, ref b); }
+    static ref int Pick(ref Point p) => ref p.Y;
+    static void Keep(Handle h) { Console.WriteLine("keep " + h.Id.ToString()); }
+    static void Main()
+    {
+        mut var p = new Point(1, 2);
+        mut var q = p;
+        q.Shift(10);
+        Console.WriteLine(p.Sum());
+        Console.WriteLine(q.Sum());
+        mut int i = 1;
+        Bump(ref i);
+        Console.WriteLine(i);
+        Set(out int o);
+        Console.WriteLine(o);
+        Console.WriteLine(Read(in p));
+        Swap(ref p, ref q);
+        Console.WriteLine(p.X);
+        Pick(ref p) = 77;
+        Console.WriteLine(p.Y);
+        ref int r = ref p.X;
+        r = 5;
+        Console.WriteLine(p.X);
+        var h = new Handle(1);
+        Keep(h);
+        var k = new Handle(2);
+        var moved = k;
+        Console.WriteLine("end");
+    }
+}

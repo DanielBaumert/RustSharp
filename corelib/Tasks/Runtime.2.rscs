@@ -1,0 +1,154 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    public static unsafe partial class Runtime
+    {
+        [ThreadStatic] private static int s_budget;
+
+        /// <summary>
+        /// Tokio's cooperative budget: after many ready operations in one step, a task yields even
+        /// though it could go on, so that a busy connection cannot starve the rest of its worker.
+        /// </summary>
+        public static bool ConsumeBudget()
+        {
+            if (s_current == null || --s_budget > 0) return true;
+            CurrentWaker().Wake();
+            return false;
+        }
+
+        internal static void Schedule(TaskRecord* r)
+        {
+            if (Atomic.Load(Mem.AddressOf(in r->Finished)) != 0) return;
+            if (Atomic.Exchange(Mem.AddressOf(in r->Queued), 1) != 0) return;
+            Atomic.Add(Mem.AddressOf(in r->Refs), 1L);
+            Push(r);
+        }
+
+        internal static void Release(TaskRecord* r)
+        {
+            if (Atomic.Add(Mem.AddressOf(in r->Refs), -1L) != 1) return;
+            Pthread.pthread_mutex_lock(s_lock);
+            if (r->Previous != null) r->Previous->Next = r->Next;
+            else s_live = r->Next;
+            if (r->Next != null) r->Next->Previous = r->Previous;
+            Pthread.pthread_mutex_unlock(s_lock);
+            Mem.DropInPlace(Mem.AddressOf(in r->Job));
+            Libc.free(r);
+        }
+
+        private static TaskRecord* s_live;
+
+        private static TaskRecord* NewRecord(Worker* owner, IJob job)
+        {
+            EnsureLock();
+            var r = (TaskRecord*)Libc.calloc(1, Mem.SizeOf<TaskRecord>());
+            r->Refs = 1;
+            r->Owner = (long)owner;
+            Mem.Write(Mem.AddressOf(in r->Job), job);
+            Pthread.pthread_mutex_lock(s_lock);
+            r->Next = s_live;
+            if (s_live != null) s_live->Previous = r;
+            s_live = r;
+            Pthread.pthread_mutex_unlock(s_lock);
+            return r;
+        }
+
+        /// <summary>Runs one scheduled task on this worker.</summary>
+        private static void RunOne(TaskRecord* r)
+        {
+            Atomic.Store(Mem.AddressOf(in r->Running), 1);
+            Atomic.Store(Mem.AddressOf(in r->Queued), 0);
+            if (Atomic.Load(Mem.AddressOf(in r->Finished)) == 0)
+            {
+                if (Atomic.Load(Mem.AddressOf(in r->Cancel)) != 0)
+                {
+                    // Shutdown: the frame goes away on the thread that owns it.
+                    Atomic.Store(Mem.AddressOf(in r->Finished), 1);
+                    Mem.Write(Mem.AddressOf(in r->Job), Mem.Transmute<long, IJob>(ForgetJob(r)));
+                }
+                else
+                {
+                    var previous = s_current;
+                    s_current = r;
+                    s_budget = BudgetPerStep;
+                    bool done = Mem.AsRef(Mem.AddressOf(in r->Job)).Step();
+                    s_current = previous;
+                    if (done) Atomic.Store(Mem.AddressOf(in r->Finished), 1);
+                }
+            }
+            Atomic.Store(Mem.AddressOf(in r->Running), 0);
+            Release(r);
+        }
+
+        private static long ForgetJob(TaskRecord* r)
+        {
+            Mem.DropInPlace(Mem.AddressOf(in r->Job));
+            return 0;
+        }
+
+        /// <summary>What dropping a Tokio runtime does: every task still alive is cancelled and dropped.</summary>
+        public static void Shutdown()
+        {
+            if (Atomic.Load(Mem.AddressOf(in s_started)) != 2) return;
+            Pthread.pthread_mutex_lock(s_lock);
+            TaskRecord* r = s_live;
+            int n = 0;
+            for (; r != null; r = r->Next) n++; // an upper bound: BlockOn roots are skipped below
+            var all = (TaskRecord**)Libc.malloc((long)(n + 1) * 8);
+            int k = 0;
+            for (r = s_live; r != null; r = r->Next)
+            {
+                if (r->Root != 0) continue;
+                Atomic.Add(Mem.AddressOf(in r->Refs), 1L);
+                Atomic.Store(Mem.AddressOf(in r->Cancel), 1);
+                all[k++] = r;
+            }
+            Pthread.pthread_mutex_unlock(s_lock);
+            for (int i = 0; i < k; i++) Schedule(all[i]);
+            for (int i = 0; i < k; i++)
+            {
+                while (Atomic.Load(Mem.AddressOf(in all[i]->Finished)) == 0) Pthread.usleep(50);
+                Release(all[i]);
+            }
+            Libc.free(all);
+        }
+
+        private static void* WorkerLoop(void* raw)
+        {
+            s_worker = (Worker*)raw;
+            Startup.s_threadName = 2;
+            while (true) RunOne(Pop(s_worker));
+        }
+
+        private static void StartWorkers()
+        {
+            if (Atomic.CompareExchange(Mem.AddressOf(in s_started), 0, 1) != 0)
+            {
+                while (Atomic.Load(Mem.AddressOf(in s_started)) != 2) Pthread.usleep(10);
+                return;
+            }
+            int n = Thread.ProcessorCount;
+            if (n > 8) n = 8;
+            if (n < 2) n = 2;
+            s_workers = (Worker**)Libc.malloc(8 * (long)n);
+            for (int i = 0; i < n; i++) s_workers[i] = NewWorker(1);
+            s_workerCount = n;
+            for (int i = 0; i < n; i++)
+            {
+                ulong id;
+                Pthread.pthread_create(&id, null, &WorkerLoop, s_workers[i]);
+                Pthread.pthread_detach(id);
+            }
+            Atomic.Store(Mem.AddressOf(in s_started), 2);
+        }
+
+        /// <summary>The waker of the running task, for code that has to wait for something.</summary>
+        public static Waker CurrentWaker()
+        {
+            if (s_current == null) return Waker.Noop;
+            Atomic.Add(Mem.AddressOf(in s_current->Refs), 1L);
+            return new Waker(s_current);
+        }
+    }
+}

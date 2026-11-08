@@ -1,0 +1,24 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace System.IO
+{
+    /// <summary>An I/O future that ends with Ok or Err.</summary>
+    public abstract class IoTask<T> : Task<Result<T, IoError>>
+    {
+        internal bool Done(T value)
+        {
+            _result = Some(Result<T, IoError>.Ok(value));
+            return true;
+        }
+
+        internal bool Fail(string message)
+        {
+            _result = Some(Result<T, IoError>.Err(new IoError(message)));
+            return true;
+        }
+
+        internal static Task<Result<T, IoError>> Failed(string message) => Task.FromResult(Result<T, IoError>.Err(new IoError(message)));
+    }
+}

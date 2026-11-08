@@ -1,0 +1,15 @@
+namespace System.Linq
+{
+    public unsafe ref struct TakeIter<T, I> : IIter<T> where I : IIter<T>, allows ref struct
+    {
+        private I _inner;
+        private int _left;
+        internal TakeIter(I inner, int n) { _inner = inner; _left = n; }
+        public T* Next()
+        {
+            if (_left <= 0) return null;
+            _left--;
+            return _inner.Next();
+        }
+    }
+}

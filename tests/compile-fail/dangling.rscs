@@ -1,0 +1,25 @@
+class C { public int V; public readonly int Get() => V; }
+ref struct View { ref int _p; public View(ref int p) { _p = ref p; } public readonly int Read() => _p; }
+class P
+{
+    static C Make() => new C();
+    static ref int Escape(ref int x) { mut C c = new C(); return ref c.V; } // error: CS9914
+    static void Main()
+    {
+        ref int r = ref Make().V; // error: CS9913
+        r = 1;
+
+        int z = 0;
+        mut ref int outer = ref z;
+        {
+            mut C c = new C();
+            outer = ref c.V; // error: CS9912
+        }
+        outer = 1;
+
+        mut int k = 1;
+        View v = new View(ref k);
+        k = 2; // error: CS9907
+        int w = v.Read();
+    }
+}

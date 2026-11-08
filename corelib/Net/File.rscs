@@ -1,0 +1,72 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace System.IO
+{
+    public static class File
+    {
+        [DllImport("c")] private static extern unsafe int open(byte* path, int flags, int mode);
+        [DllImport("c")] private static extern unsafe int close(int fd);
+        [DllImport("c")] private static extern unsafe long read(int fd, void* p, long n);
+        [DllImport("c")] private static extern unsafe long write(int fd, void* p, long n);
+
+        public static unsafe Result<string, IoError> ReadAllText(string path)
+        {
+            int n;
+            byte* name = path.ToUtf8(out n);
+            name[n] = 0;
+            int fd = open(name, 0, 0);
+            Libc.free(name);
+            if (fd < 0) return Result<string, IoError>.Err(new IoError("cannot open " + path));
+            long capacity = 4096, size = 0;
+            byte* data = (byte*)Libc.malloc(capacity);
+            while (true)
+            {
+                if (size == capacity)
+                {
+                    capacity *= 2;
+                    data = (byte*)Libc.realloc(data, capacity);
+                }
+                long got = read(fd, data + size, capacity - size);
+                if (got <= 0) break;
+                size += got;
+            }
+            close(fd);
+            string text = String.FromUtf8(data, (int)size);
+            Libc.free(data);
+            return Result<string, IoError>.Ok(text);
+        }
+
+        public static unsafe Result<Unit, IoError> WriteAllText(string path, string text)
+        {
+            int n;
+            byte* name = path.ToUtf8(out n);
+            name[n] = 0;
+            int fd = open(name, 0x241, 0x1A4); // O_WRONLY | O_CREAT | O_TRUNC, rw-r--r--
+            Libc.free(name);
+            if (fd < 0) return Result<Unit, IoError>.Err(new IoError("cannot open " + path));
+            byte* data = text.ToUtf8(out n);
+            long done = 0;
+            while (done < n)
+            {
+                long wrote = write(fd, data + done, n - done);
+                if (wrote <= 0) break;
+                done += wrote;
+            }
+            Libc.free(data);
+            close(fd);
+            return Result<Unit, IoError>.Ok(default);
+        }
+
+        // Files have no readiness, so these run on a blocking thread, as in tokio::fs.
+        public static async Task<Result<string, IoError>> ReadAllTextAsync(string path)
+            => Flatten(await Task.RunBlocking(move () => ReadAllText(path)));
+
+        public static async Task<Result<Unit, IoError>> WriteAllTextAsync(string path, string text)
+            => Flatten(await Task.RunBlocking(move () => WriteAllText(path, text)));
+
+        internal static Result<T, IoError> Flatten<T>(Result<Result<T, IoError>, JoinError> r)
+            => r.IsOk ? r.Unwrap() : Result<T, IoError>.Err(new IoError("background task failed"));
+    }
+}

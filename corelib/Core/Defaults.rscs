@@ -1,0 +1,12 @@
+namespace System
+{
+    // Rust's Default for the built-in types: what UnwrapOrDefault gives instead of a null.
+    public readonly partial struct Int32 : IDefault<int> { public static int Default() => 0; }
+    public readonly partial struct Int64 : IDefault<long> { public static long Default() => 0; }
+    public readonly partial struct UInt32 : IDefault<uint> { public static uint Default() => 0; }
+    public readonly partial struct UInt64 : IDefault<ulong> { public static ulong Default() => 0; }
+    public readonly partial struct Double : IDefault<double> { public static double Default() => 0; }
+    public readonly partial struct Boolean : IDefault<bool> { public static bool Default() => false; }
+    public readonly partial struct Char : IDefault<char> { public static char Default() => '\0'; }
+    public sealed partial class String : IDefault<string> { public static string Default() => ""; }
+}

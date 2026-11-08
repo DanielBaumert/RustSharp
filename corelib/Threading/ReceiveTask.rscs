@@ -1,0 +1,27 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    internal sealed unsafe class ReceiveTask<T> : System.Threading.Tasks.Task<Option<T>>
+    {
+        private ChannelState<T>* _s;
+        public ReceiveTask(ChannelState<T>* s) { _s = s; }
+        internal override bool PollCore()
+        {
+            Pthread.pthread_mutex_lock((*_s).Lock);
+            ref ChannelState<T> s = ref Mem.AsRef(_s);
+            if (s.Queue.Count == 0 && s.Senders > 0)
+            {
+                s.Receiver = Option<System.Threading.Tasks.Waker>.Some(System.Threading.Tasks.Runtime.CurrentWaker());
+                Pthread.pthread_mutex_unlock(s.Lock);
+                return false;
+            }
+            Option<T> value = s.Queue.Dequeue();
+            var next = Receiver<T>.TakeBlocked(ref s);
+            Pthread.pthread_mutex_unlock(s.Lock);
+            next.Wake();
+            _result = Some(value);
+            return true;
+        }
+    }
+}

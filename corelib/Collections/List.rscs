@@ -1,0 +1,149 @@
+namespace System.Collections.Generic
+{
+    [SendWhen(Bound.Send), SyncWhen(Bound.Sync)]
+    [CarriesBorrows]
+    public unsafe partial class List<T> : System.Collections.IEnumerable, IClone<List<T>>
+    {
+        public readonly List<T> Clone()
+        {
+            var copy = new List<T>();
+            for (int i = 0; i < _count; i++) copy.Add(Mem.CloneOf(in *(_items + i)));
+            return copy;
+        }
+
+        // Only here so that collection initializers bind; iteration uses the struct enumerator below.
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => Panic.Unreachable<System.Collections.IEnumerator>();
+
+        private T* _items;
+        private int _count;
+        private int _capacity;
+
+        public List() { }
+
+        ~List()
+        {
+            for (int i = 0; i < _count; i++) Mem.DropInPlace(_items + i);
+            Libc.free(_items);
+        }
+
+        public readonly int Count => _count;
+        internal readonly T* Data => _items;
+
+        // Rust's Vec::into_iter: ReadOut moves elements out bitwise, then ForgetAll sets the length to zero, so
+        // the moved slots count as uninitialized memory and are not dropped again. No slot is ever zeroed.
+        internal T ReadOut(int i) => Mem.Read(_items + i);
+        internal void ForgetAll() { _count = 0; }
+
+        public void Add(T item)
+        {
+            if (_count == _capacity)
+            {
+                _capacity = _capacity == 0 ? 4 : _capacity * 2;
+                _items = (T*)Libc.realloc(_items, (long)_capacity * Mem.SizeOf<T>());
+            }
+            Mem.Write(_items + _count, item);
+            _count++;
+        }
+
+        private readonly void Check(int i)
+        {
+            if ((uint)i >= (uint)_count) Panic.Raise("index out of bounds: the len is " + _count.ToString() + " but the index is " + i.ToString());
+        }
+
+        public ref T this[int i]
+        {
+            get { Check(i); return ref *(_items + i); }
+        }
+
+        /// <summary>Shared access to an element; the indexer needs exclusive access to the list.</summary>
+        public readonly ref readonly T At(int i)
+        {
+            Check(i);
+            return ref *(_items + i);
+        }
+
+        /// <summary>Rust's Vec::pop: None when the list is empty.</summary>
+        public Option<T> RemoveLast()
+        {
+            if (_count == 0) return Option<T>.None;
+            _count--;
+            return Option<T>.Some(Mem.Read(_items + _count));
+        }
+
+        public T RemoveAt(int i)
+        {
+            Check(i);
+            T item = Mem.Read(_items + i);
+            for (int k = i; k + 1 < _count; k++) Mem.Write(_items + k, Mem.Read(_items + k + 1));
+            _count--;
+            return item;
+        }
+
+        public void Clear()
+        {
+            for (int i = 0; i < _count; i++) Mem.DropInPlace(_items + i);
+            _count = 0;
+        }
+
+        public void Insert(int index, T item)
+        {
+            if ((uint)index > (uint)_count) Panic.Raise("insertion index (is " + index.ToString() + ") should be <= len (is " + _count.ToString() + ")");
+            Add(item);
+            T last = Mem.Read(_items + _count - 1);
+            for (int k = _count - 1; k > index; k--) Mem.Write(_items + k, Mem.Read(_items + k - 1));
+            Mem.Write(_items + index, last);
+        }
+
+        public readonly bool Contains(in T item)
+        {
+            for (int i = 0; i < _count; i++)
+                if (Mem.EqualOf(in *(_items + i), in item)) return true;
+            return false;
+        }
+
+        /// <summary>Stable merge sort; elements move, nothing is cloned.</summary>
+        public void Sort()
+        {
+            if (_count < 2) return;
+            T* scratch = (T*)Libc.malloc((long)_count * Mem.SizeOf<T>());
+            SortRange(_items, scratch, 0, _count);
+            Libc.free(scratch);
+        }
+
+        private static void SortRange(T* a, T* tmp, int lo, int hi)
+        {
+            if (hi - lo < 2) return;
+            int mid = (lo + hi) / 2;
+            SortRange(a, tmp, lo, mid);
+            SortRange(a, tmp, mid, hi);
+            int i = lo, j = mid, k = lo;
+            while (i < mid && j < hi)
+            {
+                if (Mem.CompareOf(in *(a + j), in *(a + i)) < 0) { Mem.Write(tmp + k, Mem.Read(a + j)); j++; }
+                else { Mem.Write(tmp + k, Mem.Read(a + i)); i++; }
+                k++;
+            }
+            for (; i < mid; i++, k++) Mem.Write(tmp + k, Mem.Read(a + i));
+            for (; j < hi; j++, k++) Mem.Write(tmp + k, Mem.Read(a + j));
+            for (k = lo; k < hi; k++) Mem.Write(a + k, Mem.Read(tmp + k));
+        }
+
+        public void Reverse()
+        {
+            for (int i = 0, j = _count - 1; i < j; i++, j--) Mem.Swap(ref *(_items + i), ref *(_items + j));
+        }
+
+        public readonly Enumerator GetEnumerator() => new Enumerator(_items, _count);
+        public Span<T> AsSpan() => new Span<T>(_items, _count);
+
+        public ref struct Enumerator
+        {
+            private T* _p;
+            private int _i;
+            private int _n;
+            internal Enumerator(T* p, int n) { _p = p; _i = -1; _n = n; }
+            public bool MoveNext() { _i++; return _i < _n; }
+            public readonly ref readonly T Current { get => ref *(_p + _i); }
+        }
+    }
+}

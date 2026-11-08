@@ -1,0 +1,150 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    public static unsafe partial class Runtime
+    {
+        [ThreadStatic] private static Worker* s_worker;
+        [ThreadStatic] private static TaskRecord* s_current;
+        private static Worker** s_workers;
+        private static int s_workerCount;
+        private static int s_started;
+
+        private static void* s_lock;
+        private static Ring s_new;
+
+        private static void EnsureLock()
+        {
+            if (Atomic.CompareExchange(Mem.AddressOf(in s_lockState), 0, 1) == 0)
+            {
+                s_lock = Libc.malloc(64);
+                Pthread.pthread_mutex_init(s_lock, null);
+                Atomic.Store(Mem.AddressOf(in s_lockState), 2);
+            }
+            while (Atomic.Load(Mem.AddressOf(in s_lockState)) != 2) Pthread.usleep(10);
+        }
+
+        private static int s_lockState;
+
+        private static Worker* NewWorker(int takesNewTasks)
+        {
+            EnsureLock();
+            var w = (Worker*)Libc.calloc(1, Mem.SizeOf<Worker>());
+            w->Lock = Libc.malloc(64);
+            Pthread.pthread_mutex_init(w->Lock, null);
+            w->Ready = Libc.malloc(64);
+            Pthread.pthread_cond_init(w->Ready, null);
+            w->TakesNewTasks = takesNewTasks;
+            return w;
+        }
+
+        /// <summary>
+        /// A started task goes back to its worker. A new one has no owner yet: it waits in a shared queue
+        /// and belongs to whichever worker picks it up, which balances the load across workers.
+        /// </summary>
+        private static void WakeIdleWorker()
+        {
+            for (int i = 0; i < s_workerCount; i++)
+            {
+                Worker* w = s_workers[i];
+                Pthread.pthread_mutex_lock(w->Lock);
+                bool idle = w->Idle != 0;
+                if (idle) Pthread.pthread_cond_signal(w->Ready);
+                Pthread.pthread_mutex_unlock(w->Lock);
+                if (idle) return;
+            }
+        }
+
+        private static void Push(TaskRecord* r)
+        {
+            var owner = (Worker*)Atomic.Load(Mem.AddressOf(in r->Owner));
+            if (owner != null)
+            {
+                Pthread.pthread_mutex_lock(owner->Lock);
+                owner->Queue.Add(r);
+                bool idle = owner->Idle != 0;
+                if (idle) Pthread.pthread_cond_signal(owner->Ready);
+                Pthread.pthread_mutex_unlock(owner->Lock);
+                if (!idle) WakeIdleWorker(); // its owner is busy, so someone else can take it
+                return;
+            }
+
+            Pthread.pthread_mutex_lock(s_lock);
+            s_new.Add(r);
+            Pthread.pthread_mutex_unlock(s_lock);
+            WakeIdleWorker();
+        }
+
+        private static TaskRecord* TakeNew(Worker* w)
+        {
+            Pthread.pthread_mutex_lock(s_lock);
+            TaskRecord* r = s_new.Count > 0 ? s_new.Take() : null;
+            Pthread.pthread_mutex_unlock(s_lock);
+            if (r != null) Atomic.Store(Mem.AddressOf(in r->Owner), (long)w);
+            return r;
+        }
+
+        /// <summary>Takes a task from a busy worker. Tasks pinned to their thread stay where they are.</summary>
+        private static TaskRecord* Steal(Worker* thief)
+        {
+            for (int i = 0; i < s_workerCount; i++)
+            {
+                Worker* victim = s_workers[i];
+                if (victim == thief) continue;
+                Pthread.pthread_mutex_lock(victim->Lock);
+                TaskRecord* found = null;
+                int n = victim->Queue.Count;
+                for (int k = 0; k < n; k++)
+                {
+                    TaskRecord* r = victim->Queue.Take();
+                    // A task woken while it runs is queued too; it must not run twice at once.
+                    bool free = Atomic.Load(Mem.AddressOf(in r->Pinned)) == 0 && Atomic.Load(Mem.AddressOf(in r->Running)) == 0;
+                    if (found == null && free) found = r;
+                    else victim->Queue.Add(r);
+                }
+                Pthread.pthread_mutex_unlock(victim->Lock);
+                if (found != null)
+                {
+                    Atomic.Store(Mem.AddressOf(in found->Owner), (long)thief);
+                    return found;
+                }
+            }
+            return null;
+        }
+
+        private static TaskRecord* Pop(Worker* w)
+        {
+            while (true)
+            {
+                Pthread.pthread_mutex_lock(w->Lock);
+                TaskRecord* r = w->Queue.Count > 0 ? w->Queue.Take() : null;
+                Pthread.pthread_mutex_unlock(w->Lock);
+                if (r != null) return r;
+
+                if (w->TakesNewTasks != 0)
+                {
+                    r = TakeNew(w);
+                    if (r == null) r = Steal(w);
+                    if (r != null) return r;
+                }
+
+                Pthread.pthread_mutex_lock(w->Lock);
+                if (w->Queue.Count == 0)
+                {
+                    w->Idle = 1;
+                    Pthread.pthread_cond_wait(w->Ready, w->Lock);
+                    w->Idle = 0;
+                }
+                Pthread.pthread_mutex_unlock(w->Lock);
+            }
+        }
+
+        /// <summary>Called by coroutines whose frame is not Send.</summary>
+        public static void PinCurrent()
+        {
+            if (s_current != null) Atomic.Store(Mem.AddressOf(in s_current->Pinned), 1);
+        }
+
+        private const int BudgetPerStep = 128;
+    }
+}

@@ -1,0 +1,67 @@
+using System;
+using System.Collections.Generic;
+class Holder { public List<Ref<int>> Items = new List<Ref<int>>(); }
+class P
+{
+    static readonly int Long = 0;
+    static List<Ref<int>> Escapes()
+    {
+        int local = 1;
+        mut var list = new List<Ref<int>>();
+        list.Add(Ref<int>.Of(in local)); // error: CS9912
+        return list;
+    }
+
+    static void Main()
+    {
+        mut var list = new List<Ref<int>>();
+        {
+            int inner = 1;
+            list.Add(Ref<int>.Of(in inner)); // error: CS9912
+        }
+        Console.WriteLine(list.Count);
+
+        mut Ref<int> kept = Ref<int>.Of(in Long);
+        {
+            int scoped = 2;
+            mut var l2 = new List<Ref<int>>();
+            l2.Add(Ref<int>.Of(in scoped)); // error: CS9912
+            foreach (var r in l2) kept = r; // error: CS9912
+        }
+        Console.WriteLine(kept.Value);
+
+        mut Option<Ref<int>> popped = None;
+        {
+            int gone = 3;
+            mut var s = new Stack<Ref<int>>();
+            s.Push(Ref<int>.Of(in gone)); // error: CS9912
+            popped = s.Pop();
+        }
+        Console.WriteLine(popped.IsSome);
+
+        mut Ref<int> indexed = Ref<int>.Of(in Long);
+        {
+            int temp = 4;
+            mut var l3 = new List<Ref<int>>();
+            l3.Add(Ref<int>.Of(in temp)); // error: CS9912
+            indexed = l3[0];
+        }
+        Console.WriteLine(indexed.Value);
+
+        mut int target = 5;
+        mut var muts = new List<RefMut<int>>();
+        muts.Add(RefMut<int>.Of(ref target));
+        target = 6; // error: CS9907
+        Console.WriteLine(muts.Count);
+
+        mut var values = new List<int>();
+        values.Add(1);
+        var element = Ref<int>.Of(in values.At(0));
+        values.Add(2); // error: CS9909
+        Console.WriteLine(element.Value);
+
+        int field = 7;
+        mut var h = new Holder();
+        h.Items.Add(Ref<int>.Of(in field)); // error: CS9914
+    }
+}

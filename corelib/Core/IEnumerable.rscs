@@ -1,0 +1,5 @@
+namespace System.Collections
+{
+    [BorrowHolder] public interface IEnumerator { object Current { get; } bool MoveNext(); void Reset(); }
+    [BorrowHolder] public interface IEnumerable { IEnumerator GetEnumerator(); }
+}

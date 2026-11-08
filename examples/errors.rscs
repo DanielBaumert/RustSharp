@@ -1,0 +1,23 @@
+using System.Collections.Generic;
+
+class File { public void Close() { } }
+
+class Program
+{
+    static void Archive(File f) { }
+
+    static void Main()
+    {
+        mut var log = new File();
+        Archive(log);
+        log.Close();
+
+        mut var list = new List<int>();
+        list.Add(1);
+        
+        ref int first = ref list[0];
+        list.Add(2);
+        
+        first = 3;
+    }
+}

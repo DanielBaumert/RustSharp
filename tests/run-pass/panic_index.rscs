@@ -1,0 +1,16 @@
+using System;
+using System.Collections.Generic;
+// exit: 101
+class Noisy { string _n; public Noisy(string n) { _n = n; } ~Noisy() { Console.WriteLine("drop " + _n); } }
+class P
+{
+    static int At(int[] a, int i) => a[i];
+    static void Main()
+    {
+        var keep = new Noisy("keep");
+        int[] a = new int[3];
+        Console.WriteLine("before");
+        Console.WriteLine(At(a, 5));
+        Console.WriteLine("never");
+    }
+}

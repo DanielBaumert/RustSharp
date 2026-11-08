@@ -1,0 +1,37 @@
+namespace System
+{
+    /// <summary>The name of a type, from typeof or GetType. There is no reflection behind it.</summary>
+    public class Type
+    {
+        private string _fullName;
+        private Type(string fullName) { _fullName = fullName; }
+        public static Type Of(string fullName) => new Type(fullName);
+        // typeof is lowered to Type.Of with the name; this signature is only for Roslyn.
+        public static Type GetTypeFromHandle(RuntimeTypeHandle h) => Panic.Unreachable<Type>();
+
+        public readonly string FullName => _fullName.Clone();
+
+        /// <summary>Without namespaces; type arguments stay as they are.</summary>
+        public readonly string Name
+        {
+            get
+            {
+                int start = 0;
+                for (int i = 0; i < _fullName.Length; i++)
+                {
+                    char c = (char)_fullName.ByteAt(i);
+                    if (c == '<') break;
+                    if (c == '.') start = i + 1;
+                }
+                return _fullName.Substring(start, _fullName.Length - start);
+            }
+        }
+
+        public override readonly string ToString() => _fullName.Clone();
+        // Roslyn's record members need exactly this signature, so `==` takes its operands by value.
+        // Same compares without moving them.
+        public static bool operator ==(Type a, Type b) => a._fullName == b._fullName;
+        public static bool operator !=(Type a, Type b) => a._fullName != b._fullName;
+        public readonly bool Same(in Type other) => _fullName == other._fullName;
+    }
+}

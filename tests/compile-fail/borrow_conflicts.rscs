@@ -1,0 +1,46 @@
+class C { public int V; }
+struct S { public int X; }
+class P
+{
+    static void Two(ref int a, ref int b) { }
+    static void Mixed(ref int a, in int b) { }
+    static void Main()
+    {
+        mut int a = 1;
+        ref int r = ref a;
+        a = 2; // error: CS9907
+        r = 3;
+
+        int b = 1;
+        ref int r2 = ref b;
+        int c = b; // error: CS9908
+        r2 = 3;
+
+        int d = 1;
+        ref readonly int s = ref d;
+        ref int m = ref d; // error: CS9909
+        m = 1;
+        int use = s;
+
+        int e = 1;
+        ref int m2 = ref e;
+        ref readonly int s2 = ref e; // error: CS9910
+        m2 = 1;
+        int use2 = s2;
+
+        int f = 1;
+        ref int m3 = ref f;
+        ref int m4 = ref f; // error: CS9911
+        m3 = 1;
+        m4 = 1;
+
+        mut int g = 1;
+        Two(ref g, ref g); // error: CS9911
+        Mixed(ref g, in g); // error: CS9910
+
+        var o = new C();
+        ref int field = ref o.V;
+        var moved = o; // error: CS9906
+        field = 1;
+    }
+}

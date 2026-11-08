@@ -1,0 +1,93 @@
+namespace System
+{
+    /// <summary>Changing a string, as Rust's String does; it needs a `mut` variable.</summary>
+    public sealed unsafe partial class String
+    {
+        /// <summary>Makes the buffer this string's own, with room for `extra` more bytes.</summary>
+        private void MakeUnique(int extra)
+        {
+            if (_rc < 0) Panic.Raise("cannot change a static string");
+            long* count = (long*)(_data - 8);
+            bool shared = _capacity < 0 || System.Threading.Atomic.Load(count) != 1;
+            if (!shared && _length + extra <= _capacity) return;
+            int capacity = _capacity < 8 ? 8 : _capacity;
+            while (capacity < _length + extra) capacity *= 2;
+            byte* fresh = NewBuffer(capacity);
+            Libc.memcpy(fresh, _data, _length);
+            fresh[_length] = 0;
+            if (_capacity >= 0 && System.Threading.Atomic.Add(count, -1L) == 1) Libc.free(_data - 8);
+            _data = fresh;
+            _capacity = capacity;
+        }
+
+        public readonly int Capacity => _capacity < 0 ? _length : _capacity;
+        public void Reserve(int extra) { MakeUnique(extra); }
+
+        /// <summary>Appends a char, encoded as UTF-8.</summary>
+        public void Push(Rune c)
+        {
+            uint bytes = Rune.Encode(c, out int n);
+            MakeUnique(n);
+            for (int k = 0; k < n; k++) _data[_length + k] = (byte)(bytes >> (8 * k));
+            _length += n;
+            _data[_length] = 0;
+        }
+
+        public void PushStr(in string s)
+        {
+            if (s._length == 0) return;
+            MakeUnique(s._length);
+            Libc.memcpy(_data + _length, s._data, s._length);
+            _length += s._length;
+            _data[_length] = 0;
+        }
+
+        /// <summary>Removes the last char: None when empty.</summary>
+        public Option<Rune> Pop()
+        {
+            if (_length == 0) return Option<Rune>.None;
+            int start = _length - 1;
+            while (start > 0 && (_data[start] & 0xC0) == 0x80) start--;
+            var c = Rune.Decode(_data + start, _length - start, out _);
+            MakeUnique(0);
+            _length = start;
+            _data[_length] = 0;
+            return Option<Rune>.Some(c);
+        }
+
+        /// <summary>Shortens to `length` bytes, which must be a char boundary.</summary>
+        public void Truncate(int length)
+        {
+            if (length >= _length) return;
+            CheckBoundary(length);
+            MakeUnique(0);
+            _length = length;
+            _data[_length] = 0;
+        }
+
+        public void Clear() { Truncate(0); }
+
+        /// <summary>Inserts at byte index `at`, a char boundary.</summary>
+        public void Insert(int at, Rune c)
+        {
+            CheckBoundary(at);
+            uint bytes = Rune.Encode(c, out int n);
+            MakeUnique(n);
+            for (int i = _length - 1; i >= at; i--) _data[i + n] = _data[i];
+            for (int k = 0; k < n; k++) _data[at + k] = (byte)(bytes >> (8 * k));
+            _length += n;
+            _data[_length] = 0;
+        }
+
+        public void InsertStr(int at, in string s)
+        {
+            CheckBoundary(at);
+            int n = s._length;
+            MakeUnique(n);
+            for (int i = _length - 1; i >= at; i--) _data[i + n] = _data[i];
+            Libc.memcpy(_data + at, s._data, n);
+            _length += n;
+            _data[_length] = 0;
+        }
+    }
+}

@@ -1,0 +1,15 @@
+class P
+{
+    static ref 'b int Ok(ref 'a int x, ref 'b int y) where 'a : 'b { return ref x; }
+    static ref 'b int Bad(ref 'a int x, ref 'b int y) { return ref x; } // error: CS9915
+    static ref 'c int Chain(ref 'a int x, ref 'b int y, ref 'c int z) where 'a : 'b where 'b : 'c { return ref x; }
+    static void Main()
+    {
+        mut int a = 1, b = 2;
+        ref int r = ref Ok(ref a, ref b);
+        a = 3; // error: CS9907
+        r = 4;
+    }
+}
+interface ISource { ref 'a int Pick(ref 'a int x, ref int y); }
+class Wrong : ISource { public ref 'b int Pick(ref int x, ref 'b int y) => ref y; } // error: CS9915

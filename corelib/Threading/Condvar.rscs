@@ -1,0 +1,26 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    /// <summary>Waits for a condition under a Mutex: Rust's Condvar.</summary>
+    [SendWhen(Bound.Always), SyncWhen(Bound.Always)]
+    public unsafe class Condvar
+    {
+        private void* _cond;
+        public Condvar()
+        {
+            _cond = Libc.malloc(64);
+            Pthread.pthread_cond_init(_cond, null);
+        }
+        ~Condvar()
+        {
+            Pthread.pthread_cond_destroy(_cond);
+            Libc.free(_cond);
+        }
+
+        /// <summary>Releases the lock while waiting and holds it again afterwards.</summary>
+        public readonly void Wait<T>(ref Mutex<T>.Guard guard) { Pthread.pthread_cond_wait(_cond, guard.RawLock); }
+        public readonly void NotifyOne() { Pthread.pthread_cond_signal(_cond); }
+        public readonly void NotifyAll() { Pthread.pthread_cond_broadcast(_cond); }
+    }
+}

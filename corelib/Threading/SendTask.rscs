@@ -1,0 +1,29 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    internal sealed unsafe class SendTask<T> : System.Threading.Tasks.Task<int>
+    {
+        private ChannelState<T>* _s;
+        private Option<T> _value;
+        public SendTask(ChannelState<T>* s, T value) { _s = s; _value = Option<T>.Some(value); }
+        internal override bool PollCore()
+        {
+            Pthread.pthread_mutex_lock((*_s).Lock);
+            ref ChannelState<T> s = ref Mem.AsRef(_s);
+            if (s.Capacity > 0 && s.Queue.Count >= s.Capacity)
+            {
+                s.Blocked.Add(System.Threading.Tasks.Runtime.CurrentWaker());
+                Pthread.pthread_mutex_unlock(s.Lock);
+                return false;
+            }
+            s.Queue.Enqueue(_value.Take().Unwrap());
+            Pthread.pthread_cond_signal(s.Ready);
+            var waiter = s.Receiver.Take();
+            Pthread.pthread_mutex_unlock(s.Lock);
+            waiter.Wake();
+            _result = Some(0); // Rust's send gives (); 0 stands for it
+            return true;
+        }
+    }
+}

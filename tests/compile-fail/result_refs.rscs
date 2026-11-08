@@ -1,0 +1,36 @@
+using System;
+class Big { public int N; }
+class P
+{
+    static Result<int, string> Make() => Result<int, string>.Ok(1);
+
+    static Result<Ref<int>, Ref<string>> Dangling()
+    {
+        var local = Make();
+        return local.AsRef(); // error: CS9912
+    }
+
+    static void Main()
+    {
+        mut var r = Make();
+        var view = r.AsRef();
+        r = Make(); // error: CS9907
+        Console.WriteLine(view.Unwrap().Value);
+
+        mut var m = Make();
+        var a = m.AsMut();
+        var b = m.AsMut(); // error: CS9911
+        Console.WriteLine(a.Unwrap().Value);
+
+        var used = Make();
+        Console.WriteLine(used.IsOkAnd(n => n > 0));
+        Console.WriteLine(used.IsOk); // error: CS9901
+
+        var big = Result<Big, string>.Ok(new Big());
+        var copy = big.AsRef().Copied(); // error: CS9922
+
+        var once = m.AsMut();
+        var moved = once;
+        Console.WriteLine(once.IsOk); // error: CS9901
+    }
+}

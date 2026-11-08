@@ -1,0 +1,12 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    internal sealed class OneshotTask<T> : Task<T>
+    {
+        private SharedResult<T> _shared;
+        private Option<Exception> _error = Option<Exception>.None;
+        internal OneshotTask(SharedResult<T> shared) { _shared = shared; }
+        internal override bool PollCore() => _shared.TryTake(ref _result, ref _error);
+    }
+}

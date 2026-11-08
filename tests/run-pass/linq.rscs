@@ -1,0 +1,47 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+class Person { public string Name; public int Age; public Person(string n, int a) { Name = n; Age = a; } }
+class P
+{
+    static void Main()
+    {
+        var nums = new List<int> { 1, 2, 3, 4, 5, 6 };
+        int limit = 2;
+        Console.WriteLine(nums.Where(x => x > limit).Select(x => x * x).Sum());
+        Console.WriteLine(nums.AsQuery().Skip(1).Take(3).Sum());
+        Console.WriteLine(nums.Where(x => x % 2 == 0).Count());
+        Console.WriteLine(nums.AsQuery().Any(x => x > 5));
+        Console.WriteLine(nums.AsQuery().All(x => x > 5));
+        Console.WriteLine(nums.AsQuery().Max().Unwrap() + nums.AsQuery().Min().Unwrap());
+        Console.WriteLine(nums.AsQuery().Aggregate(1, (a, in x) => a * x));
+        mut var evens = nums.Where(x => x % 2 == 0).ToList();
+        Console.WriteLine(evens.Count);
+        evens.Add(8);
+        Console.WriteLine(nums.Count);
+
+        var squares = from x in nums where x < 4 select x * 10;
+        foreach (var v in squares) Console.Write(v + " ");
+        Console.WriteLine();
+
+        mut var people = new List<Person>();
+        people.Add(new Person("ada", 36));
+        people.Add(new Person("bob", 17));
+        people.Add(new Person("cyd", 52));
+        mut var adults = people.Where(p => p.Age >= 18).Select(p => p.Name).ToList();
+        Console.WriteLine(adults.Count + adults[1]);
+        Console.WriteLine(people.Count);
+        foreach (ref readonly var p in people.Where(p => p.Age > 40)) Console.WriteLine(p.Name);
+
+        int[] arr = { 5, 6, 7 };
+        Console.WriteLine(arr.Where(x => x != 6).Select(x => x + 1).ToArray()[1]);
+        Console.WriteLine(Enumerable.Range(1, 4).Select(x => x * 2).Sum());
+        Console.WriteLine(Enumerable.Range(0, 3).Select(x => "s" + x.ToString()).First().Unwrap());
+        decimal total = new List<decimal> { 1.5m, 2.25m }.AsQuery().Sum();
+        Console.WriteLine(total);
+
+        mut int seen = 0;
+        nums.AsQuery().ForEach(x => { seen += x; });
+        Console.WriteLine(seen);
+    }
+}

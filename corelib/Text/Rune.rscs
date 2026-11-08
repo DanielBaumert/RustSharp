@@ -1,0 +1,49 @@
+namespace System
+{
+    /// <summary>Rust's char: one Unicode scalar value. A C# char (UTF-16) converts implicitly.</summary>
+    public readonly unsafe struct Rune
+    {
+        private readonly uint _value;
+        public Rune(uint value) { _value = value > 0x10FFFF || (value >= 0xD800 && value < 0xE000) ? 0xFFFD : value; }
+        public uint Value => _value;
+        public static implicit operator Rune(char c) => new Rune(c);
+        public static bool operator ==(Rune a, Rune b) => a._value == b._value;
+        public static bool operator !=(Rune a, Rune b) => a._value != b._value;
+        public override bool Equals(object o) => false;
+        public override int GetHashCode() => (int)_value;
+        public bool IsAscii => _value < 0x80;
+        public bool IsAsciiDigit => _value >= '0' && _value <= '9';
+        public bool IsAsciiAlphabetic => (_value | 0x20) >= 'a' && (_value | 0x20) <= 'z';
+        public bool IsWhitespace => _value == ' ' || (_value >= 9 && _value <= 13);
+        public int LenUtf8 { get { Encode(this, out int n); return n; } }
+
+        public override string ToString()
+        {
+            uint bytes = Encode(this, out int n);
+            string s = String.Allocate(n);
+            for (int k = 0; k < n; k++) s.SetByte(k, (byte)(bytes >> (8 * k)));
+            return s;
+        }
+
+        /// <summary>The UTF-8 bytes, lowest byte first, and how many there are.</summary>
+        internal static uint Encode(Rune r, out int n)
+        {
+            uint c = r._value;
+            if (c < 0x80) { n = 1; return c; }
+            if (c < 0x800) { n = 2; return (0xC0 | (c >> 6)) | ((0x80 | (c & 0x3F)) << 8); }
+            if (c < 0x10000) { n = 3; return (0xE0 | (c >> 12)) | ((0x80 | ((c >> 6) & 0x3F)) << 8) | ((0x80 | (c & 0x3F)) << 16); }
+            n = 4;
+            return (0xF0 | (c >> 18)) | ((0x80 | ((c >> 12) & 0x3F)) << 8) | ((0x80 | ((c >> 6) & 0x3F)) << 16) | ((0x80 | (c & 0x3F)) << 24);
+        }
+
+        internal static Rune Decode(byte* p, int available, out int used)
+        {
+            int b = p[0];
+            int extra = b < 0x80 ? 0 : b < 0xE0 ? 1 : b < 0xF0 ? 2 : 3;
+            uint code = (uint)(extra == 0 ? b : extra == 1 ? b & 0x1F : extra == 2 ? b & 0x0F : b & 0x07);
+            for (int k = 1; k <= extra && k < available; k++) code = (code << 6) | (uint)(p[k] & 0x3F);
+            used = extra + 1 < available ? extra + 1 : available;
+            return new Rune(code);
+        }
+    }
+}

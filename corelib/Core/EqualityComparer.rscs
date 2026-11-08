@@ -1,0 +1,10 @@
+namespace System.Collections.Generic
+{
+    public abstract class EqualityComparer<T>
+    {
+        // Only here because Roslyn's record members name it; records compare through derived code instead.
+        public static EqualityComparer<T> Default => Panic.Unreachable<EqualityComparer<T>>();
+        public abstract bool Equals(T x, T y);
+        public abstract int GetHashCode(T x);
+    }
+}

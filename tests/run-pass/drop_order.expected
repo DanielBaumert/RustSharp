@@ -1,0 +1,32 @@
+new a
+new b
+inner end
+drop b
+new c
+consume c
+drop c
+after consume
+new d
+new e
+new e2
+drop e
+after reassign
+new h1
+new h2
+h1
+new p1
+new p2
+took p1
+new loop
+drop loop
+new loop
+drop loop
+end
+drop p1
+drop p2
+drop holder
+drop h1
+drop h2
+drop e2
+drop d
+drop a

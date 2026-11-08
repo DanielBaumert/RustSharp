@@ -1,0 +1,37 @@
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
+using TaskRuntime = System.Threading.Tasks.Runtime;
+
+namespace System.Net.Sockets
+{
+    internal sealed unsafe class ReadTask : IoTask<int>
+    {
+        private Arc<SocketHandle> _socket;
+        private byte* _p;
+        private int _n;
+        public ReadTask(Arc<SocketHandle> socket, byte* p, int n) { _socket = socket; _p = p; _n = n; }
+        internal override bool PollCore()
+        {
+            if (!TaskRuntime.ConsumeBudget()) return false;
+            int fd = _socket.Value.Fd;
+            while (true)
+            {
+                long r = Sys.recv(fd, _p, _n, 0);
+                if (r >= 0)
+                {
+                    return Done((int)r);
+                }
+                int e = Sys.Errno;
+                if (e == Sys.EINTR) continue;
+                if (e == Sys.EAGAIN)
+                {
+                    if (Reactor.Wait(fd, false)) return false;
+                    continue;
+                }
+                return Fail(Address.ErrorText("read"));
+            }
+        }
+    }
+}

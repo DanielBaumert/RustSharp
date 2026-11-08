@@ -1,0 +1,27 @@
+using System.Collections.Generic;
+using System.Threading;
+
+namespace System.Threading
+{
+    /// <summary>Asks work to stop. Clones share the state; it is the one from tokio-util.</summary>
+    [SendWhen(Bound.Always), SyncWhen(Bound.Always)]
+    public struct CancellationTokenSource : IClone<CancellationTokenSource>
+    {
+        private Arc<AtomicBool> _cancelled;
+        private System.Threading.Tasks.Notify _notify;
+        public CancellationTokenSource()
+        {
+            _cancelled = new Arc<AtomicBool>(new AtomicBool(false));
+            _notify = new System.Threading.Tasks.Notify();
+        }
+        private CancellationTokenSource(Arc<AtomicBool> c, System.Threading.Tasks.Notify n) { _cancelled = c; _notify = n; }
+        public readonly CancellationTokenSource Clone() => new CancellationTokenSource(_cancelled.Clone(), _notify.Clone());
+        public readonly bool IsCancellationRequested => _cancelled.Value.Value;
+        public readonly void Cancel()
+        {
+            _cancelled.Value.Set(true);
+            _notify.NotifyOne();
+        }
+        public readonly System.Threading.Tasks.Task<int> CancelledAsync() => _notify.NotifiedAsync();
+    }
+}

@@ -1,0 +1,47 @@
+namespace System.Collections.Generic
+{
+    /// <summary>What an iterator method returns: a coroutine that hands out values.</summary>
+    public sealed unsafe class Generator<T> : IEnumerable<T>, IEnumerator<T>
+    {
+        private void* _frame;
+        private delegate*<void*, void*, int> _resume;
+        private delegate*<void*, void> _drop;
+        private Option<T> _current = Option<T>.None;
+        private bool _finished;
+
+        private Generator() { }
+
+        public static Generator<T> FromCoroutine(void* frame, delegate*<void*, void*, int> resume, delegate*<void*, void> drop)
+        {
+            var g = new Generator<T>();
+            g._frame = frame;
+            g._resume = resume;
+            g._drop = drop;
+            return g;
+        }
+
+        ~Generator() { _drop(_frame); }
+
+        public move IEnumerator<T> GetEnumerator() => this;
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => Panic.Unreachable<System.Collections.IEnumerator>();
+
+        public bool MoveNext()
+        {
+            if (_finished) return false;
+            _current = Option<T>.None; // drops an element nobody took
+            if (_resume(_frame, _current.UninitSlot()) == 1) _finished = true;
+            else _current.AssumeSome();
+            return !_finished;
+        }
+
+        /// <summary>Hands out the element: it is owned by the caller from here on.</summary>
+        public T Current
+        {
+            get => Mem.AsRef(Mem.AddressOf(in _current)).Take().Expect("Current read twice, or before MoveNext");
+        }
+
+        object System.Collections.IEnumerator.Current => Panic.Unreachable<object>();
+        public void Reset() { Panic.Raise("an iterator cannot be reset"); }
+        public void Dispose() { }
+    }
+}

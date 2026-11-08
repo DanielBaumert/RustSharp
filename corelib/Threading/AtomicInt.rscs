@@ -1,0 +1,17 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    [SendWhen(Bound.Always), SyncWhen(Bound.Always)]
+    public unsafe class AtomicInt
+    {
+        private int _value;
+        public AtomicInt(int value) { _value = value; }
+        private readonly int* Slot => Mem.AddressOf(in _value);
+        public readonly int Value { get => Atomic.Load(Slot); }
+        public readonly void Set(int value) { Atomic.Store(Slot, value); }
+        public readonly int Add(int delta) => Atomic.Add(Slot, delta) + delta;
+        public readonly int Increment() => Add(1);
+        public readonly bool CompareExchange(int expected, int value) => Atomic.CompareExchange(Slot, expected, value) == expected;
+    }
+}

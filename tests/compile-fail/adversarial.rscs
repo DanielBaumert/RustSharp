@@ -1,0 +1,116 @@
+using System;
+using System.Collections.Generic;
+class C
+{
+    public int V;
+    public C? Next = None;
+    public ref int Slot() => ref V;
+    public void Replace() { Next = None; }
+    public readonly int Get() => V;
+    public readonly ref int Sneak() => ref V; // error: CS9918
+}
+struct S { public int A; public C Owned; }
+class P
+{
+    static void Take(C c) { }
+    static void Both(in int v, ref C c) { }
+
+    static void Reborrow()
+    {
+        int x = 1;
+        ref int a = ref x;
+        ref int b = ref a;
+        a = 2; // error: CS9907
+        b = 3;
+    }
+
+    static void SharedChain()
+    {
+        mut int x = 1;
+        ref readonly int a = ref x;
+        ref readonly int b = ref a;
+        x = 2; // error: CS9907
+        int y = b;
+    }
+
+    static void ThroughRef()
+    {
+        C owner = new C();
+        ref C r = ref owner;
+        ref int f = ref r.V;
+        r = new C(); // error: CS9907
+        f = 1;
+    }
+
+    static void ThroughMethod()
+    {
+        mut C o = new C();
+        ref int f = ref o.Slot();
+        o.Replace(); // error: CS9911
+        f = 1;
+    }
+
+    static void ArgumentAliasing()
+    {
+        mut C o = new C();
+        Both(in o.V, ref o); // error: CS9909
+    }
+
+
+
+    static void AssignIntoMoved()
+    {
+        mut C c = new C();
+        Take(c);
+        c.V = 1; // error: CS9900
+    }
+
+    static void PartialStruct()
+    {
+        S s = new S { A = 1, Owned = new C() };
+        var taken = s.Owned;
+        var whole = s; // error: CS9900
+    }
+
+    static void ArrayElement()
+    {
+        mut int[] a = new int[2];
+        ref int e = ref a[0];
+        a = new int[3]; // error: CS9907
+        e = 1;
+    }
+
+    static void ListGrowDuringBorrow()
+    {
+        mut var l = new List<C>();
+        l.Add(new C());
+        foreach (ref readonly var c in l)
+        {
+            l = new List<C>(); // error: CS9907
+            int v = c.V;
+        }
+    }
+
+    static void PatternThenAssign()
+    {
+        mut object o = new C();
+        if (o is C c)
+        {
+            o = new C(); // error: CS9907
+            c.V = 1;
+        }
+    }
+
+    static void LoopCarried()
+    {
+        int x = 1;
+        ref int r = ref x;
+        for (mut int i = 0; i < 2; i++)
+        {
+            int z = x; // error: CS9908
+            r = 5;
+        }
+    }
+
+    static void Main() { }
+}

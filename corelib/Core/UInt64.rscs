@@ -1,0 +1,12 @@
+namespace System
+{
+    public readonly partial struct UInt64 { public override string ToString() => Number.FormatUnsigned(this); public override int GetHashCode() => (int)this ^ (int)(this >> 32); }
+
+    public readonly struct IntPtr { }
+
+    public readonly struct UIntPtr { }
+
+    public readonly struct Single { public override string ToString() => Number.Format((double)this); }
+
+    public readonly partial struct Double { public override string ToString() => Number.Format(this); }
+}

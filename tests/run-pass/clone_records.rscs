@@ -1,0 +1,86 @@
+using System;
+using System.Collections.Generic;
+
+[Clone]
+class Node
+{
+    public int V;
+    public string Name;
+    public Node? Next = None;
+    public int[] Data = new int[] { };
+    public Node(int v, string n) { V = v; Name = n; }
+    ~Node() { Console.WriteLine("drop " + Name); }
+}
+[Clone] struct Pair { public string A; public int B; }
+class Shape : IClone<Shape>
+{
+    public int Id;
+    public Shape(int id) { Id = id; }
+    public readonly Shape Clone() { Console.WriteLine("custom clone"); return new Shape(Id + 1); }
+}
+
+record Point(int X, string Name);
+record Line(Point A, Point B);
+record Tagged(int Id, Node Payload);
+record struct Size(int W, int H);
+record Dog(string Name, int Age);
+
+class P
+{
+    static T Dup<T>(in T x) => x.Clone();
+    static void Main()
+    {
+        mut var a = new Node(1, "a");
+        a.Next = Some(new Node(2, "b"));
+        a.Data = new int[] { 7, 8 };
+        mut var c = a.Clone();
+        c.Next.AsMut().Unwrap().Value.V = 20;
+        c.Data[0] = 70;
+        Console.WriteLine(a.Next.AsRef().Unwrap().Value.V + " " + c.Next.AsRef().Unwrap().Value.V + " " + a.Data[0] + " " + c.Data[0]);
+        c.Name = "a2";
+        c.Next.AsMut().Unwrap().Value.Name = "b2";
+
+        var p = new Pair { A = "s", B = 1 };
+        var q = p.Clone();
+        Console.WriteLine(p.A + q.A);
+        var sh = new Shape(1);
+        Console.WriteLine(sh.Clone().Id);
+        Console.WriteLine(Dup(5) + Dup("x"));
+        var list = new List<string> { "u", "v" };
+        mut var l2 = list.Clone();
+        l2.Add("w");
+        Console.WriteLine(list.Count * 10 + l2.Count);
+        string[] arr = { "m" };
+        Console.WriteLine(arr.Clone()[0]);
+
+        mut var r1 = new Point(1, "a");
+        var r2 = r1 with { X = 2 };
+        Console.WriteLine(r1.X + r2.X);
+        Console.WriteLine(r2);
+        Console.WriteLine(r1 == new Point(1, "a"));
+        Console.WriteLine(r1 != r2);
+        Console.WriteLine(r1.Equals(r2));
+        Console.WriteLine(r1.GetHashCode() == new Point(1, "a").GetHashCode());
+        var (x, n) = r1;
+        Console.WriteLine(n + x.ToString());
+        Console.WriteLine(r1.Name);
+        var ln = new Line(new Point(0, "p"), new Point(3, "q"));
+        Console.WriteLine(ln);
+        var ln2 = ln.Clone();
+        Console.WriteLine(ln == ln2);
+        Console.WriteLine(ln.B.X);
+        var s = new Size(2, 3);
+        var s2 = s with { H = 4 };
+        Console.WriteLine(s);
+        Console.WriteLine(s2.H + s.H);
+        Console.WriteLine(s == new Size(2, 3));
+        Console.WriteLine(new Dog("rex", 3));
+        Console.WriteLine(new Dog("rex", 3) == new Dog("rex", 3));
+        var t = new Tagged(1, new Node(9, "t"));
+        var owned = t.Payload;
+        Console.WriteLine(owned.V);
+        var an = new { A = 1, B = "z" };
+        Console.WriteLine(an.Equals(new { A = 1, B = "z" }));
+        Console.WriteLine("end");
+    }
+}

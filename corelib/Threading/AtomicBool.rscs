@@ -1,0 +1,15 @@
+using System.Runtime.InteropServices;
+
+namespace System.Threading
+{
+    [SendWhen(Bound.Always), SyncWhen(Bound.Always)]
+    public unsafe class AtomicBool
+    {
+        private int _value;
+        public AtomicBool(bool value) { _value = value ? 1 : 0; }
+        private readonly int* Slot => Mem.AddressOf(in _value);
+        public readonly bool Value { get => Atomic.Load(Slot) != 0; }
+        public readonly void Set(bool value) { Atomic.Store(Slot, value ? 1 : 0); }
+        public readonly bool CompareExchange(bool expected, bool value) => Atomic.CompareExchange(Slot, expected ? 1 : 0, value ? 1 : 0) == (expected ? 1 : 0);
+    }
+}

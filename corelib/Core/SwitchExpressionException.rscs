@@ -1,0 +1,52 @@
+namespace System.Runtime.CompilerServices
+{
+    /// <summary>Thrown when a switch expression over an enum meets an unnamed value.</summary>
+    internal sealed class SwitchExpressionException : Exception
+    {
+        public SwitchExpressionException() : base("internal error: entered unreachable code: a switch expression met an unnamed enum value") { }
+    }
+
+    public static class IsExternalInit { }
+
+    public sealed class IsReadOnlyAttribute : Attribute { }
+
+    public sealed class IsByRefLikeAttribute : Attribute { }
+
+    public sealed class IsUnmanagedAttribute : Attribute { }
+
+    public sealed class ExtensionAttribute : Attribute { }
+
+    public sealed class RefSafetyRulesAttribute : Attribute { public RefSafetyRulesAttribute(int version) { } }
+
+    public sealed class ScopedRefAttribute : Attribute { }
+
+    public sealed class CompilerGeneratedAttribute : Attribute { }
+
+    public sealed class AsyncStateMachineAttribute : Attribute { public AsyncStateMachineAttribute(Type t) { } }
+
+    public sealed class IteratorStateMachineAttribute : Attribute { public IteratorStateMachineAttribute(Type t) { } }
+
+    public sealed class AsyncMethodBuilderAttribute : Attribute { public AsyncMethodBuilderAttribute(Type t) { } }
+
+    public interface INotifyCompletion { void OnCompleted(Action continuation); }
+
+    public interface ICriticalNotifyCompletion : INotifyCompletion { void UnsafeOnCompleted(Action continuation); }
+
+    public static class RuntimeHelpers { public static int OffsetToStringData => 16; }
+
+    public sealed class DecimalConstantAttribute : Attribute
+    {
+        public DecimalConstantAttribute(byte scale, byte sign, uint hi, uint mid, uint low) { }
+        public DecimalConstantAttribute(byte scale, byte sign, int hi, int mid, int low) { }
+    }
+
+    public sealed class TupleElementNamesAttribute : Attribute { public TupleElementNamesAttribute(string[] names) { } }
+
+    public sealed class UnscopedRefAttribute : Attribute { }
+
+    public sealed class RequiresLocationAttribute : Attribute { }
+
+    public sealed class InterpolatedStringHandlerAttribute : Attribute { }
+
+    public sealed class CompilerFeatureRequiredAttribute : Attribute { public CompilerFeatureRequiredAttribute(string name) { } }
+}

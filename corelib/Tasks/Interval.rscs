@@ -1,0 +1,18 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>Ticks at a fixed rate, without drift: `time::interval`.</summary>
+    public sealed class Interval
+    {
+        private long _next;
+        private int _period;
+        public Interval(int milliseconds) { _period = milliseconds; _next = Runtime.NowMs() + milliseconds; }
+        public Task TickAsync()
+        {
+            long wait = _next - Runtime.NowMs();
+            _next += _period;
+            return Task.Delay(wait > 0 ? (int)wait : 0);
+        }
+    }
+}

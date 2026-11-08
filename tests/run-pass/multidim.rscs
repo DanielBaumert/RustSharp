@@ -1,0 +1,39 @@
+using System;
+class C { public int V; public C(int v) { V = v; } ~C() { Console.WriteLine("drop " + V.ToString()); } }
+class P
+{
+    static int Sum(in int[,] m)
+    {
+        mut int s = 0;
+        for (mut int i = 0; i < m.GetLength(0); i++)
+            for (mut int j = 0; j < m.GetLength(1); j++)
+                s += m[i, j];
+        return s;
+    }
+    static void Main()
+    {
+        mut var m = new int[2, 3];
+        m[1, 2] = 7;
+        m[0, 1] = 5;
+        Console.WriteLine(m[1, 2]);
+        Console.WriteLine(m.Length);
+        Console.WriteLine(m.GetLength(0) * 10 + m.GetLength(1));
+        Console.WriteLine(Sum(in m));
+        var t = new int[,] { { 1, 2 }, { 3, 4 }, { 5, 6 } };
+        Console.WriteLine(t[2, 1]);
+        mut int all = 0;
+        foreach (var x in t) all = all * 10 + x;
+        Console.WriteLine(all);
+        mut var c = new int[2, 2, 2];
+        c[1, 0, 1] = 9;
+        Console.WriteLine(c[1, 0, 1] + c.GetUpperBound(2) + c.GetLowerBound(0));
+        mut var names = new string[,] { { "", "" } };
+        names[0, 1] = "x" + "y";
+        Console.WriteLine(names[0, 1]);
+        mut var objects = new C[,] { { new C(1) }, { new C(2) } };
+        ref C slot = ref objects[1, 0];
+        slot = new C(3);
+        int[] flat = { 1, 2, 3 };
+        Console.WriteLine(flat.GetLength(0) + flat.GetUpperBound(0));
+    }
+}

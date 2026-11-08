@@ -1,0 +1,14 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>A task completed by hand: a oneshot channel.</summary>
+    [SendWhen(Bound.Send), SyncWhen(Bound.Send)]
+    public struct TaskCompletionSource<T>
+    {
+        private SharedResult<T> _shared;
+        public TaskCompletionSource() { _shared = new SharedResult<T>(); }
+        public readonly Task<T> Task => new OneshotTask<T>(_shared.Clone());
+        public readonly void SetResult(T value) { _shared.Finish(Option<T>.Some(value), Option<Exception>.None); }
+    }
+}

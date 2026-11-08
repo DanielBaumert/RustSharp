@@ -1,0 +1,20 @@
+using System.Runtime.CompilerServices;
+
+namespace System.Threading.Tasks
+{
+    /// <summary>Awaiting it gives Err when the task panicked or was aborted, like tokio's JoinHandle.</summary>
+    public class JoinTask<T> : Task<Result<T, System.Threading.JoinError>>
+    {
+        internal SharedResult<T> _shared;
+        private Option<T> _value = Option<T>.None;
+        private Option<Exception> _failure = Option<Exception>.None;
+        internal JoinTask(SharedResult<T> shared) { _shared = shared; }
+        internal override bool PollCore()
+        {
+            if (!_shared.TryTake(ref _value, ref _failure)) return false;
+            if (_failure.IsSome) _result = Some(Result<T, System.Threading.JoinError>.Err(System.Threading.JoinError.From(_failure.Take().Unwrap())));
+            else _result = Some(Result<T, System.Threading.JoinError>.Ok(_value.Take().Unwrap()));
+            return true;
+        }
+    }
+}

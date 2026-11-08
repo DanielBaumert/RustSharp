@@ -1,0 +1,78 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+class Data { public int V; public string Name; public Data(int v, string n) { V = v; Name = n; } ~Data() { Console.WriteLine("drop " + Name); } }
+class Config { public static readonly int Workers = Compute(); static int Compute() => 4; }
+class P
+{
+    static void Main()
+    {
+        // Join hands the result back.
+        mut var t = Thread.Run(move () => 6 * 7);
+        Console.WriteLine(t.Join().Unwrap());
+
+        // Ownership moves into the thread.
+        var data = new Data(5, "moved");
+        mut var owner = Thread.Run(move () => data.V * 2);
+        Console.WriteLine(owner.Join().Unwrap());
+
+        // Shared counter behind Arc<Mutex<T>>.
+        var counter = new Arc<Mutex<int>>(new Mutex<int>(0));
+        mut var threads = new List<Thread<int>>();
+        for (mut int i = 0; i < Config.Workers; i++)
+        {
+            var c = counter.Clone();
+            threads.Add(Thread.Run(move () =>
+            {
+                for (mut int k = 0; k < 10000; k++)
+                {
+                    mut var g = c.Value.Lock();
+                    g.Value = g.Value + 1;
+                }
+                return 0;
+            }));
+        }
+        while (threads.Count > 0) threads.RemoveAt(0).Join();
+        Console.WriteLine(counter.Value.Lock().Value);
+        Console.WriteLine(counter.Count);
+
+        // Atomics.
+        var hits = new Arc<AtomicInt>(new AtomicInt(0));
+        mut var workers = new List<Thread<int>>();
+        for (mut int i = 0; i < 3; i++)
+        {
+            var h = hits.Clone();
+            workers.Add(Thread.Run(move () => { for (mut int k = 0; k < 1000; k++) h.Value.Increment(); return 1; }));
+        }
+        while (workers.Count > 0) workers.RemoveAt(0).Join();
+        Console.WriteLine(hits.Value.Value);
+
+        // Channels.
+        var (tx, rx) = Channel.Create<string>();
+        mut var senders = new List<Thread<int>>();
+        for (mut int i = 0; i < 3; i++)
+        {
+            var s = tx.Clone();
+            int id = i;
+            senders.Add(Thread.Run(move () => { s.Send("m" + id.ToString()); return id; }));
+        }
+        Mem.Drop(tx);
+        mut int received = 0;
+        while (rx.Receive().Ok() is Some(var message)) received += message.Length;
+        Console.WriteLine(received);
+        while (senders.Count > 0) senders.RemoveAt(0).Join();
+
+        // A panic ends its thread; Join returns Err, as in Rust.
+        mut var failing = Thread.Run<int>(move () => { Panic.Raise("worker failed"); return 0; });
+        Console.WriteLine(failing.Join().UnwrapErr().Message);
+
+        // Each thread gets its own copy of the string, as with String::clone in Rust.
+        string shared = "x" + "y".ToString();
+        var a = shared.Clone();
+        var b = shared.Clone();
+        mut var ta = Thread.Run(move () => a.Length);
+        mut var tb = Thread.Run(move () => b.Length);
+        Console.WriteLine(ta.Join().Unwrap() + tb.Join().Unwrap());
+        Console.WriteLine(shared);
+    }
+}
