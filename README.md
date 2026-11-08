@@ -1,5 +1,7 @@
 # RustSharp
 
+![banner](/assets/banner.png)
+
 RustSharp is an experimental C# compiler that combines C# syntax with Rust-inspired
 ownership, borrowing, lifetimes, and deterministic destruction. It is built as
 a fork of [Roslyn](https://github.com/dotnet/roslyn), with a native LLVM
@@ -33,7 +35,8 @@ released deterministically when their owner leaves scope.
 - `Drop`, `Clone`, and opt-in `[Copy]` types
 - Traits through C# interfaces with default methods
 - UTF-8 `string`/`str` types
-- Generics, LINQ, iterators, records, closures, and pattern matching
+- Generics, records, closures, and pattern matching
+- LINQ on Rust's iterator model: `Option<T> Next()`, borrowed items as `Ref<T>`, auto-deref
 - Native `async`/`await`, tasks, channels, timers, and networking
 - LLVM IR and MIR output for compiler development
 - A VS Code extension with diagnostics, hover information, completion,
@@ -168,8 +171,8 @@ general performance claims.
 - `dynamic`, general reflection, and arbitrary-object `lock` are unsupported.
 - There is no `null`, neither in user code nor in the core library; use `Option<T>` for optional values.
   Only raw pointers in `unsafe` code may be null, as with Rust's `ptr::null`.
-- Core-library iterators (`IIter<T>.Next()`) still return a raw `T*` and signal the end with a null
-  pointer, instead of an `Option<Ref<T>>` like Rust's `Iterator::next`.
+- Types have no lifetime parameters. A closure result that borrows from its argument, such as the key
+  in `OrderBy(s => s)` on `Ref<string>` items, is rejected; return the value instead (`x => x.Value`).
 - Tasks are lazy, like Rust futures, rather than automatically starting like
   ordinary C# tasks.
 - The runtime uses a single reactor thread; file I/O runs on dedicated threads.
