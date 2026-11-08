@@ -28,7 +28,7 @@ released deterministically when their owner leaves scope.
 
 - Rust-style ownership and move checking
 - Shared (`in`) and exclusive (`ref`) borrows
-- Non-lexical lifetimes and lifetime annotations
+- Non-lexical lifetimes, lifetime annotations, and lifetime parameters on ref structs (`Pair<'a, 'b>`)
 - `mut` variables with immutable-by-default bindings
 - `Option<T>` instead of `null`, in user code and in the core library
 - `Result<T, E>` and `?` error propagation
@@ -171,8 +171,9 @@ general performance claims.
 - `dynamic`, general reflection, and arbitrary-object `lock` are unsupported.
 - There is no `null`, neither in user code nor in the core library; use `Option<T>` for optional values.
   Only raw pointers in `unsafe` code may be null, as with Rust's `ptr::null`.
-- Types have no lifetime parameters. A closure result that borrows from its argument, such as the key
-  in `OrderBy(s => s)` on `Ref<string>` items, is rejected; return the value instead (`x => x.Value`).
+- Lifetime parameters (`ref struct Pair<'a, 'b>`) exist for ref structs only; the core library's types
+  do not use them yet. A closure result that borrows from its argument, such as the key in
+  `OrderBy(s => s)` on `Ref<string>` items, is therefore still rejected; use `x => x.Value`.
 - Tasks are lazy, like Rust futures, rather than automatically starting like
   ordinary C# tasks.
 - The runtime uses a single reactor thread; file I/O runs on dedicated threads.

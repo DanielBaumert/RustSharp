@@ -1,0 +1,46 @@
+// Lifetime parameters on types: Pair<'a, 'b> holds two independent borrows, like Rust's struct Pair<'a, 'b>.
+using System;
+
+ref struct Pair<'a, 'b>
+{
+    public ref readonly 'a int X;
+    public ref readonly 'b int Y;
+    public Pair(ref readonly 'a int x, ref readonly 'b int y) { X = ref x; Y = ref y; }
+}
+
+ref struct Swapped<'a, 'b>
+{
+    public ref readonly 'a int X;
+    public ref readonly 'b int Y;
+    public Swapped(ref readonly 'a int x, ref readonly 'b int y) { X = ref y; Y = ref x; } // error: CS9915
+}
+
+ref struct MutPair<'a, 'b>
+{
+    public ref 'a int X;
+    public ref 'b int Y;
+    public MutPair(ref 'a int x, ref 'b int y) { X = ref x; Y = ref y; }
+}
+
+class P
+{
+    static ref readonly 'a int First<'a, 'b>(in Pair<'a, 'b> pair) => ref pair.X;
+
+    // The result is bound to 'a, but Y lives for 'b.
+    static ref readonly 'a int WrongField<'a, 'b>(in Pair<'a, 'b> pair) => ref pair.Y; // error: CS9915
+
+    // Rust: no &'a mut through &Pair.
+    static ref 'a int MutThroughShared<'a, 'b>(in MutPair<'a, 'b> pair) => ref pair.X; // error: CS9918 // error: CS9915
+
+    static void FirstKeepsX()
+    {
+        mut int x = 1;
+        mut int y = 2;
+        var p = new Pair<'_, '_>(in x, in y);
+        ref readonly int r = ref First(in p);
+        x = 3; // error: CS9907
+        Console.WriteLine(r);
+    }
+
+    static void Main() { }
+}

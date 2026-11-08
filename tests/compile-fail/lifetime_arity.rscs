@@ -1,0 +1,17 @@
+// The number of lifetime arguments must match what a type declares, like Rust's E0107, so that none is
+// ignored silently. Roslyn reports this while binding, before the borrow checker runs.
+using System;
+
+ref struct Pair<'a, 'b>
+{
+    public ref readonly 'a int X;
+    public ref readonly 'b int Y;
+}
+
+class P
+{
+    static void Half(in Pair<'a> half) { } // error: CS9939
+    static void Elided(in Pair p, in Pair<'_, '_> q) { }
+    static void NoneDeclared(Ref<'a, int> r) { } // error: CS9939
+    static void Main() { }
+}

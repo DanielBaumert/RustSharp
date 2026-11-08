@@ -162,16 +162,60 @@ Usually no annotations are needed; the rules match Rust's elision:
 2. Otherwise the result comes from the only input that carries a reference.
 3. Several candidates without an annotation are an error (CS9916).
 
-Inputs the result does not come from can be excluded with `scoped`. Ambiguous cases get a name.
-Lifetimes are not declared; a name is valid for one signature:
+A lifetime is written directly behind the kind of reference, like Rust's `&'a T`: `ref 'a T` is
+`&'a mut T`, `in 'a T` and `ref readonly 'a T` are `&'a T`. Inputs the result does not come from can be
+excluded with `scoped`. A method may declare its lifetimes after its name, as in Rust, or simply use
+them:
 
 ```csharp
-static ref 'a int Larger(ref 'a int x, ref 'a int y) { ... }
+static ref 'a int Larger<'a>(ref 'a int x, ref 'a int y) { ... }
+static ref 'a int Larger(ref 'a int x, ref 'a int y) { ... }       // the same
 static ref int First(ref int x, scoped ref int y) => ref x;
-static 'a View Make(ref 'a int x, ref int y) { ... }
+static ref 'b int Shorter(ref 'a int x, ref 'b int y) where 'a : 'b => ref x;
 ```
 
 `'a` is only read as a lifetime when no closing quote follows. `'a'` stays a character literal.
+
+### Lifetime parameters on types
+
+A type may declare lifetime parameters, like Rust's `struct Pair<'a, 'b>`. They come first, before the
+type parameters, and a value of the type holds one borrow per lifetime. A field names the lifetime it
+borrows for:
+
+```csharp
+ref struct Pair<'a, 'b>
+{
+    public ref readonly 'a int X;
+    public ref readonly 'b int Y;
+    public Pair(ref readonly 'a int x, ref readonly 'b int y) { X = ref x; Y = ref y; }
+}
+
+static ref readonly 'a int First<'a, 'b>(in Pair<'a, 'b> pair) => ref pair.X;
+
+var p = new Pair(in x, in y);
+ref readonly int r = ref First(in p);
+y = 3;                       // ok: r borrows x only ('a), and p is no longer used
+x = 3;                       // CS9907 while r is used
+```
+
+- Lifetime arguments come first in a type: `Pair<'a, 'b>`, `Entry<'a, T>`, `Ref<'a, string>`. Left out,
+  or written `'_`, a lifetime is elided: `Pair` is `Pair<'_, '_>`, and every elided position is a
+  lifetime of its own.
+- As in Rust, a live value keeps all its lifetimes alive. Only what is taken out of it through a field,
+  or returned under one lifetime's name, is bound to that lifetime alone.
+- A field without a lifetime borrows for as long as the whole value.
+- Storing into the wrong slot is `CS9915` (`X = ref y` in the constructor above), and so is returning
+  `ref pair.Y` as `'a`.
+- Through a shared reference, a `ref` field gives no exclusive access (`CS9918`), as Rust gives no
+  `&'a mut` through `&Pair`.
+- The number of lifetime arguments must match the declaration, like Rust's E0107 (`CS9939`):
+  `Pair<'a>` and `Ref<'a, int>` (the core library's `Ref` declares none yet) are errors.
+- The older prefix `'a View` names the one implicit lifetime of a returned ref struct that declares no
+  lifetime parameters. It is deprecated; declare `ref struct View<'a>` instead.
+
+Not yet: lifetime parameters on classes and ordinary structs that store borrows (`CS9914`), variance
+beyond what the rules above imply, `where T : 'a`, and lifetimes in the core library's types (`Ref`,
+`str`, queries).
 
 ### Ref structs
 
@@ -292,6 +336,9 @@ elements must be iterated by reference, because otherwise they would be moved ou
 foreach (ref readonly var node in nodes) Console.WriteLine(node.Value);
 ```
 
+Or, as in Rust's `for node in nodes.iter()`, with `Ref<T>` items that may be kept as long as the
+list lives: `foreach (var node in nodes.Iter()) Console.WriteLine(node.Value);`
+
 ## Clone
 
 Nothing is deep-copied implicitly. If you need a copy, call `x.Clone()`. This works for Copy types,
@@ -369,17 +416,45 @@ and calling one needs exclusive access (`CS9927`).
 
 ## LINQ
 
-LINQ works directly on lists and arrays, also in query syntax. It is lazy, monomorphized, and borrows the
-collection. Lambdas receive the elements as `in` borrows:
+LINQ works directly on lists and arrays, also in query syntax. It is lazy and monomorphized, and it
+follows Rust's iterators. A query on a collection **lends** its elements as `Ref<T>`, like
+`v.iter()` gives `&T`. Computed items (`Select`, `Zip`, `Enumerate`, `Range`, `Chars()`, `Split`) are
+**owned**. Members and operators reach through a `Ref` by themselves (see auto-deref below), so most
+lambdas read as in C#:
 
 ```csharp
-var names = people.Where(p => p.Age >= 18).Select(p => p.Name).ToList();
-var squares = from x in nums where x < 4 select x * x;
+var names = people.Where(p => p.Age >= 18).Select(p => p.Name).ToList();   // List<string>
+foreach (var p in people.Where(p => p.Age > 40)) Console.WriteLine(p.Name); // p is Ref<Person>
+var squares = from x in nums where x < 4 select x * x;                       // x is Ref<int>
+var evens = nums.Where(x => x % 2 == 0).Copied().ToList();                    // List<int>
 ```
 
-A query may only be iterated once. `ToList`, `First` and similar methods clone their results, so the
-elements need Clone. As long as a query is alive, the collection is borrowed. Collections without a
-direct `Where` entry point reach the other methods through `AsQuery()`.
+| Method | Item it hands out | Rust |
+|---|---|---|
+| `list.Where(...)`, `AsQuery()`, `Iter()`, `Take`, `Skip`, `Order()` on a list | `Ref<T>` | `iter()`, `filter`, ... |
+| `Select(f)`, `Map(f)` | what `f` returns, owned | `map` |
+| `Zip`, `Enumerate` | owned tuples | `zip`, `enumerate` |
+| `Enumerable.Range`, `Chars()`, `Bytes()`, `Split`, `Lines` | `int`, `Rune`, `byte`, `str` | `0..n`, `chars()`, `bytes()`, `split` |
+| `Cloned()`, `Copied()` on a `Ref<T>` query | `T` | `cloned()`, `copied()` |
+
+- Consuming methods move the items, they never clone them: `ToList`/`Collect` give a `List<Ref<T>>`
+  on a borrowing query, `First`, `Last`, `Max`, `Min`, `Find`, `Nth` give an `Option<Ref<T>>`. Use
+  `Cloned()` or `Copied()` for owned values. `list.ToList()` directly on a collection is a copy, like
+  `to_vec()`, and needs Clone.
+- `Where`, `Any`, `All`, `Count`, `TakeWhile`, `SkipWhile`, `First(f)` and the key of `OrderBy`/`GroupBy`
+  look at an item (`in T`, Rust's `&Item`). `Select`, `Aggregate`/`Fold` and `ForEach` take it by value.
+- `Max`, `Min`, `Order`, `Distinct`, `Contains` and `GroupBy` compare what a `Ref` points at. Of several
+  equal items, `Max` gives the last one and `Min` the first, as in Rust.
+- A query may only be iterated once. As long as a query or an item it lent is alive, the collection is
+  borrowed: changing it is `CS9909`, letting it die first is `CS9912`. Owned items may be kept freely; a
+  `str` from `Split` still points at the text.
+- `q.Next()` is Rust's `next()`: `while (q.Next() is Some(var x)) ...` (the query must be `mut`).
+- An `OrderBy` key that is itself a reference (`OrderBy(s => s)` on `Ref<string>` items) is `CS9915`, as
+  RustSharp types carry no lifetime parameters. Write the value: `OrderBy(x => x.Value)`, Rust's
+  `|x| *x`.
+
+Your own iterator implements `IIter<T>` with `Option<T> Next()`. It may lend what it borrows, never
+itself: `Some(Ref<int>.Of(in _field))` in `Next` is `CS9915`.
 
 ## Iterators
 
@@ -578,6 +653,24 @@ assigning to `r` is then `CS9907`. Two `AsMut` at the same time are `CS9911`, an
 meant to leave a method but points into a local is `CS9912`. `Ref<T>` is Copy; `RefMut<T>` is moved.
 `Ref<T>.Of(in x)` and `RefMut<T>.Of(ref x)` correspond to `&x` and `&mut x`.
 
+**Auto-deref**, as in Rust: a member that `Ref<T>` or `RefMut<T>` does not have itself is looked up on
+the value behind it, through any number of references. Operators see through them too, like Rust's
+`impl Add<&i32> for i32`:
+
+```csharp
+var r = Ref<Person>.Of(in p);
+Console.WriteLine(r.Name + r.Age);     // r.Value.Name, r.Value.Age
+bool old = r.Age > 40 && r.IsAdult();  // readonly methods only: r.Birthday() is CS9918
+mut int sum = 0;
+sum += Ref<int>.Of(in x);              // the right side of a compound assignment
+```
+
+Auto-deref never changes the rules: a shared `Ref` stays shared (`r.Age = 5` is `CS9917`), and moving
+out of it is `CS9902`. Two things still need `.Value`, as Rust needs `*`: converting to the value
+itself (`int n = x.Value;`, `new List<int> { x.Value }`) and writing through a `RefMut`
+(`m.Value += 1`, Rust's `*m += 1`). `Ref<T>`'s own members `Value`, `Of` and `ToString` win; `ToString`
+shows the value.
+
 References may also be stored in collections, like Rust's `Vec<&T>`: `List`, `Dictionary`, `HashSet`,
 `Queue`, `Stack` and `SortedDictionary`. What a collection stores must outlive it
 (`list.Add(Ref<int>.Of(in x))` requires `x` to live longer than `list`), and what comes out of it
@@ -723,3 +816,4 @@ The most important building blocks in `Mem`:
 | CS9936 | `#nullable`: references are never `null` |
 | CS9937 | `x!`, `??`, `??=`, `?.` on a reference, `as` |
 | CS9938 | an expression would hold `null`: `default`, `new T[n]`, `new S()` |
+| CS9939 | the number of lifetime arguments does not match the declaration |

@@ -1,0 +1,48 @@
+// Lifetime parameters on types: Pair<'a, 'b> holds two independent borrows, like Rust's struct Pair<'a, 'b>.
+using System;
+
+ref struct Pair<'a, 'b>
+{
+    public ref readonly 'a int X;
+    public ref readonly 'b int Y;
+    public Pair(ref readonly 'a int x, ref readonly 'b int y) { X = ref x; Y = ref y; }
+    public readonly ref readonly 'a int GetX() => ref X;
+    public readonly int Sum() => X + Y;
+}
+
+// Lifetimes come first in a mixed list, as in Rust; Roslyn sees Entry<T>.
+struct Entry<'a, T> { public T Value; public Entry(T v) { Value = v; } }
+
+class P
+{
+    static ref readonly 'a int First<'a, 'b>(in Pair<'a, 'b> pair) => ref pair.X;
+    static ref readonly 'b int Second<'a, 'b>(in Pair<'a, 'b> pair) => ref pair.Y;
+
+    static void Main()
+    {
+        mut int x = 1;
+        mut int y = 2;
+
+        // First is bound to 'a only: once p is dead, y may change while r is still used.
+        var p = new Pair<'_, '_>(in x, in y);
+        Console.WriteLine(p.Sum());
+        ref readonly int r = ref First(in p);
+        y = 3;
+        Console.WriteLine(r + y);
+
+        // The other way round: Second keeps y, x is free.
+        var q = new Pair<'_, '_>(in x, in y);
+        ref readonly int s = ref Second(in q);
+        x = 10;
+        Console.WriteLine(s + x);
+
+        // A method of the type itself, named after its lifetime.
+        var w = new Pair(in x, in y);       // lifetimes elided
+        ref readonly int g = ref w.GetX();
+        y = 4;
+        Console.WriteLine(g + y);
+
+        Ref<int> keep = Ref<int>.Of(in x);
+        Console.WriteLine(keep.Value + new Entry<'static, int>(5).Value);
+    }
+}
