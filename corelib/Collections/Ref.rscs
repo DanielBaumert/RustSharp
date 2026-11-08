@@ -6,7 +6,7 @@ namespace System
     /// keeps it from outliving what it points to. Like &amp;T it is Copy.
     /// </summary>
     [Reference]
-    public readonly unsafe struct Ref<T>
+    public readonly unsafe struct Ref<'a, T>
     {
         private readonly T* _p;
         private Ref(T* p) { _p = p; }

@@ -12,6 +12,8 @@ class P
 {
     static void Half(in Pair<'a> half) { } // error: CS9939
     static void Elided(in Pair p, in Pair<'_, '_> q) { }
-    static void NoneDeclared(Ref<'a, int> r) { } // error: CS9939
+    static void NoneDeclared(Option<'a, int> o) { } // error: CS9939
+    static void TooMany(Ref<'a, 'b, int> r) { } // error: CS9939
+    static void Right(Ref<'a, int> r, Ref<int> s) { }
     static void Main() { }
 }

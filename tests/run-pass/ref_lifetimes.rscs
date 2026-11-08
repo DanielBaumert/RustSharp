@@ -1,0 +1,38 @@
+// Ref<'a, T> is Rust's &'a T: several independent references in signatures and fields.
+using System;
+
+ref struct RPair<'a, 'b>
+{
+    public Ref<'a, int> X;
+    public Ref<'b, int> Y;
+    public RPair(Ref<'a, int> x, Ref<'b, int> y) { X = x; Y = y; }
+}
+
+class P
+{
+    // Rust: fn pick<'a, 'b>(x: &'a i32, y: &'b i32) -> &'a i32 { x }
+    static Ref<'a, int> Pick<'a, 'b>(Ref<'a, int> x, Ref<'b, int> y) => x;
+    static Ref<'a, int> FirstOf<'a, 'b>(in RPair<'a, 'b> p) => p.X;
+    // Elision as in Rust: one input, so the result (and every elided lifetime in it) comes from it.
+    static Ref<int> Same(Ref<int> x) => x;
+    static RPair Make(Ref<int> x) => new RPair(x, x);
+
+    static void Main()
+    {
+        mut int a = 1;
+        mut int b = 2;
+
+        var r = Pick(Ref<int>.Of(in a), Ref<int>.Of(in b));
+        b = 3;                          // ok: r borrows a only
+        Console.WriteLine(r + b);
+
+        var p = new RPair(Ref<int>.Of(in a), Ref<int>.Of(in b));
+        var f = FirstOf(in p);
+        b = 4;                          // ok: p is no longer used, f borrows a only
+        Console.WriteLine(f + b);
+
+        Console.WriteLine(Same(Ref<int>.Of(in a)).Value);
+        var m = Make(Ref<int>.Of(in a));
+        Console.WriteLine(m.X + m.Y);
+    }
+}

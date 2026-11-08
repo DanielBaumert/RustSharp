@@ -1,0 +1,34 @@
+// Ref<'a, T> is Rust's &'a T: what is named 'a must come from 'a.
+using System;
+
+ref struct RPair<'a, 'b>
+{
+    public Ref<'a, int> X;
+    public Ref<'b, int> Y;
+    public RPair(Ref<'a, int> x, Ref<'b, int> y) { X = x; Y = y; }
+}
+
+ref struct Crossed<'a, 'b>
+{
+    public Ref<'a, int> X;
+    public Ref<'b, int> Y;
+    public Crossed(Ref<'a, int> x, Ref<'b, int> y) { X = y; Y = x; } // error: CS9915
+}
+
+class P
+{
+    static Ref<'a, int> Pick<'a, 'b>(Ref<'a, int> x, Ref<'b, int> y) => x;
+    static Ref<'a, int> PickWrong<'a, 'b>(Ref<'a, int> x, Ref<'b, int> y) => y; // error: CS9915
+    static Ref<'a, int> FieldWrong<'a, 'b>(in RPair<'a, 'b> p) => p.Y; // error: CS9915
+
+    static void KeepsA()
+    {
+        mut int a = 1;
+        mut int b = 2;
+        var r = Pick(Ref<int>.Of(in a), Ref<int>.Of(in b));
+        a = 3; // error: CS9907
+        Console.WriteLine(r.Value);
+    }
+
+    static void Main() { }
+}

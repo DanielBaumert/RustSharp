@@ -32,6 +32,18 @@ class P
     // Rust: no &'a mut through &Pair.
     static ref 'a int MutThroughShared<'a, 'b>(in MutPair<'a, 'b> pair) => ref pair.X; // error: CS9918 // error: CS9915
 
+    // Elided lifetimes in a result come from the input, as in Rust: the body is fine, the caller is bound.
+    static Pair MakeElided(ref readonly int x) => new Pair(in x, in x);
+
+    static void ElidedResultKeepsX()
+    {
+        mut int x = 1;
+        var p = MakeElided(in x);
+        ref readonly int r = ref First(in p);
+        x = 2; // error: CS9907
+        Console.WriteLine(r);
+    }
+
     static void FirstKeepsX()
     {
         mut int x = 1;

@@ -18,6 +18,8 @@ class P
     static ref readonly 'a int First<'a, 'b>(in Pair<'a, 'b> pair) => ref pair.X;
     static ref readonly 'b int Second<'a, 'b>(in Pair<'a, 'b> pair) => ref pair.Y;
 
+    static Pair MakeElided(ref readonly int x) => new Pair(in x, in x);
+
     static void Main()
     {
         mut int x = 1;
@@ -41,6 +43,9 @@ class P
         ref readonly int g = ref w.GetX();
         y = 4;
         Console.WriteLine(g + y);
+
+        var e = MakeElided(in x);
+        Console.WriteLine(First(in e) + Second(in e));
 
         Ref<int> keep = Ref<int>.Of(in x);
         Console.WriteLine(keep.Value + new Entry<'static, int>(5).Value);

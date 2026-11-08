@@ -208,14 +208,26 @@ x = 3;                       // CS9907 while r is used
   `ref pair.Y` as `'a`.
 - Through a shared reference, a `ref` field gives no exclusive access (`CS9918`), as Rust gives no
   `&'a mut` through `&Pair`.
+- Elided lifetimes in a result come from where the result comes from, as in Rust:
+  `static Pair Make(ref readonly int x) => new Pair(in x, in x);` borrows `x` for both.
 - The number of lifetime arguments must match the declaration, like Rust's E0107 (`CS9939`):
-  `Pair<'a>` and `Ref<'a, int>` (the core library's `Ref` declares none yet) are errors.
+  `Pair<'a>`, `Ref<'a, 'b, int>` and `Option<'a, int>` are errors.
 - The older prefix `'a View` names the one implicit lifetime of a returned ref struct that declares no
   lifetime parameters. It is deprecated; declare `ref struct View<'a>` instead.
 
+`Ref<'a, T>` and `RefMut<'a, T>` are Rust's `&'a T` and `&'a mut T`. A value of a type with one
+lifetime lives exactly as long as it, so several references stay independent, in signatures as in
+fields:
+
+```csharp
+static Ref<'a, int> Pick<'a, 'b>(Ref<'a, int> x, Ref<'b, int> y) => x;   // y => CS9915
+
+ref struct RPair<'a, 'b> { public Ref<'a, int> X; public Ref<'b, int> Y; }
+```
+
 Not yet: lifetime parameters on classes and ordinary structs that store borrows (`CS9914`), variance
-beyond what the rules above imply, `where T : 'a`, and lifetimes in the core library's types (`Ref`,
-`str`, queries).
+beyond what the rules above imply, `where T : 'a`, lifetimes flowing through the type parameters of a
+generic method (so `OrderBy(s => s)` on `Ref<string>` items is still `CS9915`), and `str<'a>`.
 
 ### Ref structs
 
