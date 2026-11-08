@@ -147,8 +147,8 @@ namespace System
 
         // ---- iteration
 
-        public unsafe readonly System.Linq.Query<T, System.Linq.SliceIter<T>> Iter()
-            => new System.Linq.Query<T, System.Linq.SliceIter<T>>(new System.Linq.SliceIter<T>(_some ? Mem.AddressOf(in _value) : null, _some ? 1 : 0));
+        public unsafe readonly System.Linq.Query<Ref<T>, System.Linq.SliceIter<T>> Iter()
+            => new System.Linq.Query<Ref<T>, System.Linq.SliceIter<T>>(new System.Linq.SliceIter<T>(_some ? Mem.AddressOf(in _value) : null, _some ? 1 : 0));
         public unsafe OnceMut<T> IterMut() => new OnceMut<T>(_some ? Mem.AddressOf(in _value) : null);
 
         // ---- matching: `o is Some(var v)` tests IsSome first, then calls Deconstruct.

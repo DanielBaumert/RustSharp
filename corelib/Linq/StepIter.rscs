@@ -1,0 +1,18 @@
+namespace System.Linq
+{
+    public ref struct StepIter<T, I> : IIter<T> where I : IIter<T>, allows ref struct
+    {
+        private I _inner;
+        private int _step;
+        private bool _started;
+        internal StepIter(I inner, int step) { _inner = inner; _step = step < 1 ? 1 : step; _started = false; }
+        public Option<T> Next()
+        {
+            if (_started)
+                for (int k = 1; k < _step; k++)
+                    if (_inner.Next().IsNone) return Option<T>.None;
+            _started = true;
+            return _inner.Next();
+        }
+    }
+}

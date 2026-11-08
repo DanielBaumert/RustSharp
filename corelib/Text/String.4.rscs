@@ -8,8 +8,8 @@ namespace System
             => new System.Linq.Query<Rune, Text.CharsIter>(new Text.CharsIter(_data, _length));
 
         /// <summary>The UTF-8 bytes, like Rust's bytes().</summary>
-        public readonly System.Linq.Query<byte, System.Linq.SliceIter<byte>> Bytes()
-            => new System.Linq.Query<byte, System.Linq.SliceIter<byte>>(new System.Linq.SliceIter<byte>(_data, _length));
+        public readonly System.Linq.Query<byte, System.Linq.ClonedIter<byte, System.Linq.SliceIter<byte>>> Bytes()
+            => new System.Linq.Query<byte, System.Linq.ClonedIter<byte, System.Linq.SliceIter<byte>>>(new System.Linq.ClonedIter<byte, System.Linq.SliceIter<byte>>(new System.Linq.SliceIter<byte>(_data, _length)));
 
         /// <summary>The whole string as a str: Rust's as_str().</summary>
         public readonly str AsStr() => new str(_data, _length);

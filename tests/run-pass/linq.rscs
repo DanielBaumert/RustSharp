@@ -14,8 +14,8 @@ class P
         Console.WriteLine(nums.AsQuery().Any(x => x > 5));
         Console.WriteLine(nums.AsQuery().All(x => x > 5));
         Console.WriteLine(nums.AsQuery().Max().Unwrap() + nums.AsQuery().Min().Unwrap());
-        Console.WriteLine(nums.AsQuery().Aggregate(1, (a, in x) => a * x));
-        mut var evens = nums.Where(x => x % 2 == 0).ToList();
+        Console.WriteLine(nums.AsQuery().Aggregate(1, (a, x) => a * x));
+        mut var evens = nums.Where(x => x % 2 == 0).Copied().ToList();   // List<int>, like .copied().collect()
         Console.WriteLine(evens.Count);
         evens.Add(8);
         Console.WriteLine(nums.Count);
@@ -31,7 +31,7 @@ class P
         mut var adults = people.Where(p => p.Age >= 18).Select(p => p.Name).ToList();
         Console.WriteLine(adults.Count + adults[1]);
         Console.WriteLine(people.Count);
-        foreach (ref readonly var p in people.Where(p => p.Age > 40)) Console.WriteLine(p.Name);
+        foreach (var p in people.Where(p => p.Age > 40)) Console.WriteLine(p.Name);   // p is Ref<Person>
 
         int[] arr = { 5, 6, 7 };
         Console.WriteLine(arr.Where(x => x != 6).Select(x => x + 1).ToArray()[1]);

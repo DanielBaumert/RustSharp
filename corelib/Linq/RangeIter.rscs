@@ -1,17 +1,14 @@
 namespace System.Linq
 {
-    public unsafe ref struct RangeIter : IIter<int>
+    public ref struct RangeIter : IIter<int>
     {
         private int _next;
         private int _end;
-        private int _current;
         internal RangeIter(int start, int count) { _next = start; _end = start + count; }
-        public int* Next()
+        public Option<int> Next()
         {
-            if (_next == _end) return null;
-            _current = _next;
-            _next++;
-            return Mem.AddressOf(in _current);
+            if (_next == _end) return Option<int>.None;
+            return Option<int>.Some(_next++);
         }
     }
 }

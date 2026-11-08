@@ -1,0 +1,32 @@
+// Rust's auto-deref: members and operators reach through Ref<T> and RefMut<T> without .Value.
+using System;
+using System.Collections.Generic;
+class Person { public int Age; public string Name; public Person(int a, string n) { Age = a; Name = n; } public readonly bool Adult() => Age >= 18; }
+class P
+{
+    static void Main()
+    {
+        var p = new Person(20, "Ann".Clone());
+        var r = Ref<Person>.Of(in p);
+        Console.WriteLine(r.Age);                 // field
+        Console.WriteLine(r.Adult());             // readonly method
+        Console.WriteLine(r.Name.Length);         // chain
+        var rr = Ref<Ref<Person>>.Of(in r);
+        Console.WriteLine(rr.Age);                // nested
+        int x = 41;
+        var rx = Ref<int>.Of(in x);
+        Console.WriteLine(rx + 1);                // operator
+        Console.WriteLine(rx < 50);
+        Console.WriteLine(-rx);
+        Console.WriteLine(rx == Ref<int>.Of(in x));
+        Console.WriteLine(r.ToString() == p.ToString());
+        mut int y = 1;
+        var m = RefMut<int>.Of(ref y);
+        m.Value += 1;
+        Console.WriteLine(y);
+        mut var list = new List<int>();
+        var rl = RefMut<List<int>>.Of(ref list);
+        rl.Add(5);                                // &mut method through RefMut
+        Console.WriteLine(list.Count);
+    }
+}

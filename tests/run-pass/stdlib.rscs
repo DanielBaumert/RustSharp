@@ -90,17 +90,17 @@ class P
         // LINQ
         var items = new List<Item> { new Item(3, "c"), new Item(1, "a"), new Item(2, "b"), new Item(1, "z") };
         var names = new List<string> { "bob", "ada", "cyd", "ada" };
-        foreach (var n in names.OrderBy(s => s).Distinct()) Console.Write(n + " ");
+        foreach (var n in names.OrderBy(s => s.Value).Distinct()) Console.Write(n + " ");
         Console.WriteLine();
         var nums = new List<int> { 5, 3, 8, 1 };
-        Console.WriteLine(nums.OrderByDescending(x => x).First().Unwrap());
+        Console.WriteLine(nums.OrderByDescending(x => x.Value).First().Unwrap());
         Console.WriteLine(nums.Max().Unwrap() - nums.Min().Unwrap());
         Console.WriteLine(nums.AsQuery().Average().Unwrap());
         Console.WriteLine(nums.AsQuery().Reverse().First().Unwrap());
         Console.WriteLine(nums.AsQuery().TakeWhile(x => x != 8).Count());
         Console.WriteLine(nums.AsQuery().SkipWhile(x => x != 8).First().Unwrap());
         Console.WriteLine(nums.AsQuery().Concat(nums.AsQuery()).Count());
-        foreach (ref readonly var p in nums.AsQuery().Zip(names.AsQuery())) Console.Write(p.Item2 + p.Item1.ToString() + " ");
+        foreach (var p in nums.AsQuery().Zip(names.AsQuery())) Console.Write(p.Item2 + p.Item1.ToString() + " ");
         Console.WriteLine();
         var groups = names.GroupBy(s => s.Chars().First().Unwrap());
         Console.WriteLine(groups.Get('a').Unwrap().Value.Count);
@@ -110,7 +110,7 @@ class P
         Console.WriteLine(nums.Any(x => x > 7));
         Console.WriteLine(nums.Count(x => x > 2));
         var wide = new List<int> { 1, 2 };
-        Console.WriteLine(wide.AsQuery().SelectMany(x => new List<int> { x, x * 10 }).Sum());
+        Console.WriteLine(wide.AsQuery().SelectMany(x => new List<int> { x.Value, x * 10 }).Sum());
 
         // Weak breaks cycles
         var parent = new Rc<Tree>(new Tree(1));

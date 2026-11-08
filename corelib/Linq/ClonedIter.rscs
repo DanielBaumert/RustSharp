@@ -1,0 +1,15 @@
+namespace System.Linq
+{
+    /// <summary>Clones each borrowed item: Rust's cloned().</summary>
+    public ref struct ClonedIter<T, I> : IIter<T> where I : IIter<Ref<T>>, allows ref struct
+    {
+        private I _inner;
+        internal ClonedIter(I inner) { _inner = inner; }
+        public Option<T> Next()
+        {
+            var item = _inner.Next();
+            if (item.IsNone) return Option<T>.None;
+            return Option<T>.Some(Mem.CloneOf(in item.Unwrap().Value));
+        }
+    }
+}

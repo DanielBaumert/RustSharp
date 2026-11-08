@@ -1,22 +1,23 @@
 namespace System.Linq
 {
-    public unsafe ref struct SelectManyIter<T, U, I> : IIter<U> where I : IIter<T>, allows ref struct
+    public ref struct SelectManyIter<T, U, I> : IIter<U> where I : IIter<T>, allows ref struct
     {
         private I _inner;
         private Selector<T, System.Collections.Generic.List<U>> _map;
-        private Option<System.Collections.Generic.List<U>> _current;
-        private int _i;
-        internal SelectManyIter(I inner, Selector<T, System.Collections.Generic.List<U>> map) { _inner = inner; _map = map; _current = Option<System.Collections.Generic.List<U>>.None; }
-        public U* Next()
+        private System.Collections.Generic.List<U> _reversed;
+        internal SelectManyIter(I inner, Selector<T, System.Collections.Generic.List<U>> map) { _inner = inner; _map = map; _reversed = new System.Collections.Generic.List<U>(); }
+        public Option<U> Next()
         {
-            while (_current.IsNone || _i >= _current.Slot.Count)
+            while (true)
             {
-                T* item = _inner.Next();
-                if (item == null) return null;
-                _current = Option<System.Collections.Generic.List<U>>.Some(_map(in *item));
-                _i = 0;
+                var item = _reversed.Pop();
+                if (item.IsSome) return item;
+                var source = _inner.Next();
+                if (source.IsNone) return Option<U>.None;
+                var next = _map(source.Unwrap());
+                next.Reverse();
+                _reversed = next;
             }
-            return _current.Slot.Data + _i++;
         }
     }
 }

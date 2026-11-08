@@ -1,0 +1,90 @@
+// The item types of Rust's iterators: borrowed items are Ref<T>, computed items are owned and may be
+// kept, and members and operators reach through a Ref by themselves (auto-deref).
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+class Person { public string Name; public int Age; public Person(string n, int a) { Name = n; Age = a; } }
+
+// A user iterator in safe code: it lends what it borrows, never itself.
+ref struct Evens : IIter<Ref<int>>
+{
+    private Query<Ref<int>, SliceIter<int>> _inner;
+    public Evens(Query<Ref<int>, SliceIter<int>> inner) { _inner = inner; }
+    public Option<Ref<int>> Next()
+    {
+        while (true)
+        {
+            var item = _inner.Next();
+            if (item is not Some(var r) || r % 2 == 0) return item;
+        }
+    }
+}
+
+class P
+{
+    static void Main()
+    {
+        mut var l = new List<int> { 1, 2, 3 };
+
+        // Computed items are owned: keeping them is fine.
+        mut var tens = new List<int>();
+        foreach (var x in l.Select(v => v * 10)) tens.Add(x);
+        Console.WriteLine(tens[0] + tens[1] + tens[2]);
+
+        mut var names = new List<string>();
+        foreach (var s in l.Select(v => "n" + v.ToString())) names.Add(s);
+        Console.WriteLine(names[2]);
+
+        // Chars, Range and Bytes hand out values.
+        mut var runes = new List<Rune>();
+        foreach (var c in "ab".Chars()) runes.Add(c);
+        Console.WriteLine(runes[0].ToString() + runes[1].ToString());
+        Console.WriteLine(Enumerable.Range(0, 4).ToList()[3]);
+        Console.WriteLine("hi".Bytes().Select(b => (int)b).Sum());
+
+        // Borrowed items are Ref<T> and may outlive the query, but not the list.
+        mut var people = new List<Person>();
+        people.Add(new Person("ada", 36));
+        people.Add(new Person("bob", 17));
+        mut var adults = new List<Ref<Person>>();
+        foreach (var p in people.Where(p => p.Age >= 18)) adults.Add(p);
+        Console.WriteLine(adults[0].Name + " " + adults.Count);
+        var oldest = people.AsQuery().OrderByDescending(p => p.Age).First().Unwrap();
+        Console.WriteLine(oldest.Name);
+
+        // Copied and Cloned turn borrowed items into owned ones.
+        mut var copy = l.AsQuery().Copied().ToList();
+        copy.Add(4);
+        Console.WriteLine(copy.Count + " " + l.Count);
+        mut var cloned = people.AsQuery().Select(p => p.Name).ToList();
+        Console.WriteLine(cloned[1]);
+
+        // Max, Min, Order and Contains compare what a Ref points at.
+        Console.WriteLine(l.AsQuery().Max().Unwrap() + l.AsQuery().Min().Unwrap());
+        Console.WriteLine(l.AsQuery().Contains(in l.At(1)));
+        mut var sorted = new List<string> { "b", "c", "a" }.AsQuery().Order().Select(s => s.Value).ToList();
+        Console.WriteLine(sorted[0] + sorted[2]);
+
+        // Rust's next() and a safe user iterator.
+        mut var q = l.Iter();
+        while (q.Next() is Some(var x)) Console.Write(x + " ");
+        Console.WriteLine();
+        mut var evens = new Evens(l.Iter());
+        Console.WriteLine(evens.Next().Unwrap());
+        Console.WriteLine(evens.Next().IsNone);
+
+        // Zip and Enumerate hand out owned pairs.
+        foreach (var (i, s) in names.AsQuery().Enumerate()) Console.Write(i.ToString() + s + " ");
+        Console.WriteLine();
+
+        // A str copied out of Split still points at the text.
+        var sentence = "a bb ccc".Clone();
+        mut var words = new List<str>();
+        foreach (var w in sentence.Split(' ')) words.Add(w);
+        Console.WriteLine(words[2]);
+
+        // TakeWhile ends for good at the first item that fails.
+        Console.WriteLine(new List<int> { 1, 2, 9, 1 }.AsQuery().TakeWhile(x => x < 5).Count());
+    }
+}

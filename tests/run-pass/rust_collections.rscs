@@ -32,8 +32,8 @@ class P
         // Iterator
         mut var nums = new List<int>();
         for (mut int i = 1; i <= 6; i++) nums.Push(i);
-        Console.WriteLine(nums.Iter().Filter((in int x) => x % 2 == 0).Fold(0, (acc, in x) => acc + x));
-        Console.WriteLine(nums.Iter().Position((in int x) => x == 4).Unwrap() + " " + nums.Iter().Nth(2).Unwrap() + " " + nums.Iter().Find((in int x) => x > 4).Unwrap());
+        Console.WriteLine(nums.Iter().Filter(x => x % 2 == 0).Fold(0, (acc, x) => acc + x));
+        Console.WriteLine(nums.Iter().Position(x => x == 4).Unwrap() + " " + nums.Iter().Nth(2).Unwrap() + " " + nums.Iter().Find(x => x > 4).Unwrap());
         foreach (var (i, x) in nums.Iter().Enumerate().Take(2)) Console.Write(i + ":" + x + " ");
         Console.WriteLine();
         Console.WriteLine(string.Join(",", nums.Iter().StepBy(2).Collect()) + " " + nums.Iter().Rev().First().Unwrap());

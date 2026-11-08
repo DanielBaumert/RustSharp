@@ -1,16 +1,16 @@
 namespace System.Linq
 {
-    public unsafe ref struct SkipIter<T, I> : IIter<T> where I : IIter<T>, allows ref struct
+    public ref struct SkipIter<T, I> : IIter<T> where I : IIter<T>, allows ref struct
     {
         private I _inner;
         private int _skip;
         internal SkipIter(I inner, int n) { _inner = inner; _skip = n; }
-        public T* Next()
+        public Option<T> Next()
         {
             while (_skip > 0)
             {
                 _skip--;
-                if (_inner.Next() == null) return null;
+                if (_inner.Next().IsNone) return Option<T>.None;
             }
             return _inner.Next();
         }

@@ -1,21 +1,28 @@
 namespace System.Linq
 {
-    public unsafe ref struct WhileIter<T, I> : IIter<T> where I : IIter<T>, allows ref struct
+    public ref struct WhileIter<T, I> : IIter<T> where I : IIter<T>, allows ref struct
     {
         private I _inner;
         private Predicate<T> _test;
         private bool _take;
         private bool _switched;
         internal WhileIter(I inner, Predicate<T> test, bool take) { _inner = inner; _test = test; _take = take; }
-        public T* Next()
+        public Option<T> Next()
         {
+            // take_while ends for good at the first item that fails; that item is dropped.
+            if (_take && _switched) return Option<T>.None;
             while (true)
             {
-                T* item = _inner.Next();
-                if (item == null) return null;
-                if (_take) return _test(in *item) ? item : null;
+                var item = _inner.Next();
+                if (item.IsNone) return item;
+                if (_take)
+                {
+                    if (_test(in item.Slot)) return item;
+                    _switched = true;
+                    return Option<T>.None;
+                }
                 if (_switched) return item;
-                if (!_test(in *item))
+                if (!_test(in item.Slot))
                 {
                     _switched = true;
                     return item;

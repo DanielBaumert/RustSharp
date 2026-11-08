@@ -7,7 +7,6 @@ namespace System.Text
         private str _separator;
         private bool _lines;
         private bool _done;
-        private str _current;
         private uint _charBytes;
         private int _charLength;
 
@@ -17,7 +16,6 @@ namespace System.Text
             _separator = separator;
             _lines = lines;
             _done = lines && text.Length == 0;
-            _current = default;
             _charBytes = 0;
             _charLength = 0;
         }
@@ -27,9 +25,9 @@ namespace System.Text
             _charBytes = Rune.Encode(separator, out _charLength);
         }
 
-        public str* Next()
+        public Option<str> Next()
         {
-            if (_done) return null;
+            if (_done) return Option<str>.None;
             byte* p = _rest.Data;
             int n = _rest.Length;
             int cut = -1, skip = 0;
@@ -46,17 +44,17 @@ namespace System.Text
             if (cut < 0)
             {
                 _done = true;
-                _current = _rest;
-                if (_lines && n == 0) return null;
+                if (_lines && n == 0) return Option<str>.None;
+                return Option<str>.Some(_rest);
             }
             else
             {
                 int end = _lines && cut > 0 && p[cut - 1] == '\r' ? cut - 1 : cut;
-                _current = new str(p, end);
+                var part = new str(p, end);
                 _rest = new str(p + cut + skip, n - cut - skip);
                 if (_lines && _rest.Length == 0) _done = true;
+                return Option<str>.Some(part);
             }
-            return Mem.AddressOf(in _current);
         }
     }
 }

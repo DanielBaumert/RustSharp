@@ -1,18 +1,18 @@
 namespace System.Linq
 {
-    public unsafe ref struct ZipIter<A, B, I, J> : IIter<(A, B)> where I : IIter<A>, allows ref struct where J : IIter<B>, allows ref struct
+    /// <summary>Pairs of items, owned: Rust's zip. When one side ends, an item already taken from the other is dropped.</summary>
+    public ref struct ZipIter<A, B, I, J> : IIter<(A, B)> where I : IIter<A>, allows ref struct where J : IIter<B>, allows ref struct
     {
         private I _a;
         private J _b;
-        private (A, B) _current;
         internal ZipIter(I a, J b) { _a = a; _b = b; }
-        public (A, B)* Next()
+        public Option<(A, B)> Next()
         {
-            A* x = _a.Next();
-            B* y = _b.Next();
-            if (x == null || y == null) return null;
-            _current = (Mem.CloneOf(in *x), Mem.CloneOf(in *y));
-            return Mem.AddressOf(in _current);
+            var x = _a.Next();
+            if (x.IsNone) return Option<(A, B)>.None;
+            var y = _b.Next();
+            if (y.IsNone) return Option<(A, B)>.None;
+            return Option<(A, B)>.Some((x.Unwrap(), y.Unwrap()));
         }
     }
 }

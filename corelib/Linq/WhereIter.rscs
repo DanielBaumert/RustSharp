@@ -1,16 +1,16 @@
 namespace System.Linq
 {
-    public unsafe ref struct WhereIter<T, I> : IIter<T> where I : IIter<T>, allows ref struct
+    public ref struct WhereIter<T, I> : IIter<T> where I : IIter<T>, allows ref struct
     {
         private I _inner;
         private Predicate<T> _keep;
         internal WhereIter(I inner, Predicate<T> keep) { _inner = inner; _keep = keep; }
-        public T* Next()
+        public Option<T> Next()
         {
             while (true)
             {
-                T* item = _inner.Next();
-                if (item == null || _keep(in *item)) return item;
+                var item = _inner.Next();
+                if (item.IsNone || _keep(in item.Slot)) return item;
             }
         }
     }

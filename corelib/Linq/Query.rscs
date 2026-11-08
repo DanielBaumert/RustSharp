@@ -1,10 +1,16 @@
 namespace System.Linq
 {
-    /// <summary>A lazy query. Consuming methods take it by value, like Rust's iterator adapters.</summary>
+    /// <summary>
+    /// A lazy query: Rust's iterator adapters. Consuming methods take it by value and move the items;
+    /// nothing is cloned unless the query says so (Cloned, Distinct, keys).
+    /// </summary>
     public unsafe ref partial struct Query<T, I> where I : IIter<T>, allows ref struct
     {
         private I _it;
         internal Query(I it) { _it = it; }
+
+        /// <summary>Rust's next(): the next item, None at the end.</summary>
+        public Option<T> Next() => _it.Next();
 
         public move Query<T, WhereIter<T, I>> Where(Predicate<T> keep)
             => new Query<T, WhereIter<T, I>>(new WhereIter<T, I>(_it, keep));
@@ -29,17 +35,17 @@ namespace System.Linq
         private static Query<T, OwnedIter<T>> Owned(System.Collections.Generic.List<T> list)
             => new Query<T, OwnedIter<T>>(new OwnedIter<T>(list));
 
-        /// <summary>Sorted by the elements' natural order. Elements are cloned, the source stays as it is.</summary>
+        /// <summary>Sorted by the items' natural order; references compare what they point at.</summary>
         public move Query<T, OwnedIter<T>> Order()
         {
-            var list = ToListInternal();
+            var list = ToList();
             list.Sort();
             return Owned(list);
         }
 
-        public move Query<T, OwnedIter<T>> OrderBy<K>(Selector<T, K> key)
+        public move Query<T, OwnedIter<T>> OrderBy<K>(KeySelector<T, K> key)
         {
-            var list = ToListInternal();
+            var list = ToList();
             // The keys first: if a key selector panics, nothing has been moved yet.
             var keys = new System.Collections.Generic.List<K>();
             for (int i = 0; i < list.Count; i++) keys.Add(key(in list[i]));
@@ -58,54 +64,55 @@ namespace System.Linq
             return Owned(result);
         }
 
-        public move Query<T, OwnedIter<T>> OrderByDescending<K>(Selector<T, K> key)
+        public move Query<T, OwnedIter<T>> OrderByDescending<K>(KeySelector<T, K> key)
         {
-            var q = OrderBy(key);
-            var list = q.ToList();
+            var list = OrderBy(key).ToList();
             list.Reverse();
             return Owned(list);
         }
 
         public move Query<T, OwnedIter<T>> Reverse()
         {
-            var list = ToListInternal();
+            var list = ToList();
             list.Reverse();
             return Owned(list);
         }
 
+        /// <summary>The first of each distinct item. Remembering what was seen needs Clone, as itertools' unique does.</summary>
         public move Query<T, OwnedIter<T>> Distinct()
         {
             var seen = new System.Collections.Generic.HashSet<T>();
             var result = new System.Collections.Generic.List<T>();
             while (true)
             {
-                T* item = _it.Next();
-                if (item == null) return Owned(result);
-                if (seen.Add(Mem.CloneOf(in *item))) result.Add(Mem.CloneOf(in *item));
+                var item = _it.Next();
+                if (item.IsNone) return Owned(result);
+                if (seen.Add(Mem.CloneOf(in item.Slot))) result.Add(item.Unwrap());
             }
         }
 
-        public move System.Collections.Generic.Dictionary<K, System.Collections.Generic.List<T>> GroupBy<K>(Selector<T, K> key)
+        public move System.Collections.Generic.Dictionary<K, System.Collections.Generic.List<T>> GroupBy<K>(KeySelector<T, K> key)
         {
             var groups = new System.Collections.Generic.Dictionary<K, System.Collections.Generic.List<T>>();
             while (true)
             {
-                T* item = _it.Next();
-                if (item == null) return groups;
-                K k = key(in *item);
+                var item = _it.Next();
+                if (item.IsNone) return groups;
+                K k = key(in item.Slot);
                 if (!groups.ContainsKey(in k)) groups.Set(Mem.CloneOf(in k), new System.Collections.Generic.List<T>());
-                groups[in k].Add(Mem.CloneOf(in *item));
+                groups[in k].Add(item.Unwrap());
             }
         }
 
-        public move System.Collections.Generic.Dictionary<K, T> ToDictionary<K>(Selector<T, K> key)
+        public move System.Collections.Generic.Dictionary<K, T> ToDictionary<K>(KeySelector<T, K> key)
         {
             var map = new System.Collections.Generic.Dictionary<K, T>();
             while (true)
             {
-                T* item = _it.Next();
-                if (item == null) return map;
-                map.Set(key(in *item), Mem.CloneOf(in *item));
+                var item = _it.Next();
+                if (item.IsNone) return map;
+                K k = key(in item.Slot);
+                map.Set(k, item.Unwrap());
             }
         }
 
@@ -114,9 +121,9 @@ namespace System.Linq
             var set = new System.Collections.Generic.HashSet<T>();
             while (true)
             {
-                T* item = _it.Next();
-                if (item == null) return set;
-                set.Add(Mem.CloneOf(in *item));
+                var item = _it.Next();
+                if (item.IsNone) return set;
+                set.Add(item.Unwrap());
             }
         }
 
@@ -124,9 +131,9 @@ namespace System.Linq
         {
             while (true)
             {
-                T* item = _it.Next();
-                if (item == null) return false;
-                if (Mem.EqualOf(in *item, in value)) return true;
+                var item = _it.Next();
+                if (item.IsNone) return false;
+                if (Mem.EqualOf(in item.Slot, in value)) return true;
             }
         }
 
@@ -135,20 +142,19 @@ namespace System.Linq
             int n = 0;
             while (true)
             {
-                T* item = _it.Next();
-                if (item == null) return n;
-                if (test(in *item)) n++;
+                var item = _it.Next();
+                if (item.IsNone) return n;
+                if (test(in item.Slot)) n++;
             }
         }
 
-        /// <summary>Rust's find: None when nothing matches.</summary>
+        /// <summary>Rust's find: the first item that matches, None when nothing does.</summary>
         public move Option<T> First(Predicate<T> test)
         {
             while (true)
             {
-                T* item = _it.Next();
-                if (item == null) return Option<T>.None;
-                if (test(in *item)) return Option<T>.Some(Mem.CloneOf(in *item));
+                var item = _it.Next();
+                if (item.IsNone || test(in item.Slot)) return item;
             }
         }
     }

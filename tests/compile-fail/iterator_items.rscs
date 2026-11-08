@@ -1,0 +1,63 @@
+// Items that a query lends are Ref<T> and live as long as the collection, like Rust's v.iter().
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+// A safe iterator cannot lend from itself: an item must point at what the iterator borrows.
+ref struct SelfLending : IIter<Ref<int>>
+{
+    private int _x;
+    public Option<Ref<int>> Next() => Some(Ref<int>.Of(in _x)); // error: CS9915
+}
+
+class P
+{
+    static void OutliveList()
+    {
+        mut Option<Ref<int>> keep = None;
+        {
+            mut var l = new List<int>();
+            l.Add(1);
+            foreach (var x in l.Iter()) keep = Some(x); // error: CS9914
+        }
+        Console.WriteLine(keep.IsSome);
+    }
+
+    static void ChangeWhileLent()
+    {
+        mut var l = new List<int>();
+        l.Add(1);
+        var first = l.Where(x => x > 0).First();
+        l.Add(2); // error: CS9909
+        Console.WriteLine(first.Unwrap());
+    }
+
+    static void ChangeDuringLoop()
+    {
+        mut var l = new List<int>();
+        l.Add(1);
+        foreach (var x in l.Iter()) l.Add(x.Value); // error: CS9909
+    }
+
+    static void ManualNext()
+    {
+        mut var l = new List<int>();
+        l.Add(1);
+        mut var q = l.Iter();
+        var a = q.Next();
+        l.Clear(); // error: CS9909
+        Console.WriteLine(a.Unwrap());
+    }
+
+    static void SortedRefsOutliveList()
+    {
+        mut var keep = new List<Ref<string>>();
+        {
+            var names = new List<string> { "b", "a" };
+            keep = names.AsQuery().Order().ToList(); // error: CS9912
+        }
+        Console.WriteLine(keep.Count);
+    }
+
+    static void Main() { }
+}

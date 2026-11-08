@@ -1,0 +1,15 @@
+namespace System.Linq
+{
+    public ref struct EnumerateIter<T, I> : IIter<(int, T)> where I : IIter<T>, allows ref struct
+    {
+        private I _inner;
+        private int _i;
+        internal EnumerateIter(I inner) { _inner = inner; _i = 0; }
+        public Option<(int, T)> Next()
+        {
+            var item = _inner.Next();
+            if (item.IsNone) return Option<(int, T)>.None;
+            return Option<(int, T)>.Some((_i++, item.Unwrap()));
+        }
+    }
+}

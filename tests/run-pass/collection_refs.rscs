@@ -54,7 +54,7 @@ class P
         Console.WriteLine(a1 + a2);
 
         // An Option of a reference out of a list.
-        Option<Ref<Person>> first = adults.AsQuery().First();
+        Option<Ref<Person>> first = adults.AsQuery().First().Copied();   // Option<Ref<Ref<Person>>> -> Option<Ref<Person>>, like .first().copied()
         Console.WriteLine(first.Unwrap().Value.Age);
     }
 }

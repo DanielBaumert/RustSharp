@@ -56,6 +56,6 @@ namespace System
         }
 
         public System.Linq.Query<Rune, Text.CharsIter> Chars() => new System.Linq.Query<Rune, Text.CharsIter>(new Text.CharsIter(_p, _length));
-        public System.Linq.Query<byte, System.Linq.SliceIter<byte>> Bytes() => new System.Linq.Query<byte, System.Linq.SliceIter<byte>>(new System.Linq.SliceIter<byte>(_p, _length));
+        public System.Linq.Query<byte, System.Linq.ClonedIter<byte, System.Linq.SliceIter<byte>>> Bytes() => new System.Linq.Query<byte, System.Linq.ClonedIter<byte, System.Linq.SliceIter<byte>>>(new System.Linq.ClonedIter<byte, System.Linq.SliceIter<byte>>(new System.Linq.SliceIter<byte>(_p, _length)));
     }
 }

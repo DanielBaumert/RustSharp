@@ -130,8 +130,8 @@ namespace System
         public unsafe OnceMut<T> IterMut() => new OnceMut<T>(_ok ? Mem.AddressOf(in _v.Slot) : null);
 
         /// <summary>Zero or one element: the Ok value. It works with foreach and with LINQ.</summary>
-        public unsafe readonly System.Linq.Query<T, System.Linq.SliceIter<T>> Iter()
-            => new System.Linq.Query<T, System.Linq.SliceIter<T>>(new System.Linq.SliceIter<T>(_ok ? Mem.AddressOf(in _v.Slot) : null, _ok ? 1 : 0));
+        public unsafe readonly System.Linq.Query<Ref<T>, System.Linq.SliceIter<T>> Iter()
+            => new System.Linq.Query<Ref<T>, System.Linq.SliceIter<T>>(new System.Linq.SliceIter<T>(_ok ? Mem.AddressOf(in _v.Slot) : null, _ok ? 1 : 0));
 
         public override readonly string ToString() => _ok ? "Ok(" + _v.Slot.ToString() + ")" : "Err(" + _e.Slot.ToString() + ")";
     }

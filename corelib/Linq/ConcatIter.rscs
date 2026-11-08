@@ -1,17 +1,17 @@
 namespace System.Linq
 {
-    public unsafe ref struct ConcatIter<T, I, J> : IIter<T> where I : IIter<T>, allows ref struct where J : IIter<T>, allows ref struct
+    public ref struct ConcatIter<T, I, J> : IIter<T> where I : IIter<T>, allows ref struct where J : IIter<T>, allows ref struct
     {
         private I _first;
         private J _second;
         private bool _inSecond;
         internal ConcatIter(I first, J second) { _first = first; _second = second; }
-        public T* Next()
+        public Option<T> Next()
         {
             if (!_inSecond)
             {
-                T* item = _first.Next();
-                if (item != null) return item;
+                var item = _first.Next();
+                if (item.IsSome) return item;
                 _inSecond = true;
             }
             return _second.Next();

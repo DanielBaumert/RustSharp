@@ -1,13 +1,25 @@
 namespace System.Linq
 {
+    /// <summary>`filter`, `take_while`, `any`: looks at an item, like Rust's `FnMut(&amp;Item) -> bool`.</summary>
     [Mut] public delegate bool Predicate<T>(in T item);
-    [Mut] public delegate U Selector<T, U>(in T item);
-    [Mut] public delegate A Accumulator<A, T>(A acc, in T item);
+    /// <summary>`map`: takes the item, like Rust's `FnMut(Item) -> U`.</summary>
+    [Mut] public delegate U Selector<T, U>(T item);
+    /// <summary>`sort_by_key`, `group_by`: computes a key from a borrowed item.</summary>
+    [Mut] public delegate K KeySelector<T, K>(in T item);
+    /// <summary>`fold`: takes the accumulator and the item.</summary>
+    [Mut] public delegate A Accumulator<A, T>(A acc, T item);
+    /// <summary>`inspect`: looks at an item.</summary>
     [Mut] public delegate void Visitor<T>(in T item);
+    /// <summary>`for_each`: takes the item.</summary>
+    [Mut] public delegate void Consumer<T>(T item);
 
-    /// <summary>Rust's Iterator: each call lends the next element, null at the end.</summary>
-    public unsafe interface IIter<T>
+    /// <summary>
+    /// Rust's Iterator: Next hands out the next item, None at the end. Items that a collection lends
+    /// are <c>Ref&lt;T&gt;</c> and live as long as the collection; computed items are owned. An
+    /// implementation never returns a reference into itself (in unsafe code that is a promise).
+    /// </summary>
+    public interface IIter<T>
     {
-        T* Next();
+        Option<T> Next();
     }
 }

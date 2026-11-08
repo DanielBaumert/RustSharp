@@ -15,9 +15,8 @@ namespace System.Linq
         {
             for (int i = 0; ; i++)
             {
-                T* item = _it.Next();
-                if (item == null) return Option<T>.None;
-                if (i == n) return Option<T>.Some(Mem.CloneOf(in *item));
+                var item = _it.Next();
+                if (item.IsNone || i == n) return item;
             }
         }
 
@@ -25,42 +24,13 @@ namespace System.Linq
         {
             for (int i = 0; ; i++)
             {
-                T* item = _it.Next();
-                if (item == null) return Option<int>.None;
-                if (test(in *item)) return Option<int>.Some(i);
+                var item = _it.Next();
+                if (item.IsNone) return Option<int>.None;
+                if (test(in item.Slot)) return Option<int>.Some(i);
             }
         }
 
         public move Query<(int, T), EnumerateIter<T, I>> Enumerate() => new Query<(int, T), EnumerateIter<T, I>>(new EnumerateIter<T, I>(_it));
         public move Query<T, StepIter<T, I>> StepBy(int step) => new Query<T, StepIter<T, I>>(new StepIter<T, I>(_it, step));
-    }
-
-    public unsafe ref struct EnumerateIter<T, I> : IIter<(int, T)> where I : IIter<T>, allows ref struct
-    {
-        private I _inner;
-        private int _i;
-        private Option<(int, T)> _current;
-        internal EnumerateIter(I inner) { _inner = inner; _i = 0; _current = Option<(int, T)>.None; }
-        public (int, T)* Next()
-        {
-            T* item = _inner.Next();
-            if (item == null) return null;
-            _current = Option<(int, T)>.Some((_i++, Mem.CloneOf(in *item)));
-            return Mem.AddressOf(in _current.Slot);
-        }
-    }
-
-    public unsafe ref struct StepIter<T, I> : IIter<T> where I : IIter<T>, allows ref struct
-    {
-        private I _inner;
-        private int _step;
-        private bool _started;
-        internal StepIter(I inner, int step) { _inner = inner; _step = step < 1 ? 1 : step; _started = false; }
-        public T* Next()
-        {
-            if (_started) for (int k = 1; k < _step; k++) if (_inner.Next() == null) return null;
-            _started = true;
-            return _inner.Next();
-        }
     }
 }

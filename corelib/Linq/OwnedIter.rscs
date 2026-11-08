@@ -1,15 +1,10 @@
 namespace System.Linq
 {
-    /// <summary>Iterates a list it owns, for results that had to be materialized.</summary>
-    public unsafe ref struct OwnedIter<T> : IIter<T>
+    /// <summary>Hands out the elements of a list it owns, like Vec::into_iter. What is left is dropped with it.</summary>
+    public ref struct OwnedIter<T> : IIter<T>
     {
-        private System.Collections.Generic.List<T> _list;
-        private int _i;
-        internal OwnedIter(System.Collections.Generic.List<T> list) { _list = list; }
-        public T* Next()
-        {
-            if (_i >= _list.Count) return null;
-            return _list.Data + _i++;
-        }
+        private System.Collections.Generic.List<T> _reversed;
+        internal OwnedIter(System.Collections.Generic.List<T> list) { list.Reverse(); _reversed = list; }
+        public Option<T> Next() => _reversed.Pop();
     }
 }

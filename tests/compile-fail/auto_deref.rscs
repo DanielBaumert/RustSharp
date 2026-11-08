@@ -1,0 +1,24 @@
+// Auto-deref through Ref<T> keeps every rule of an explicit .Value: shared stays shared.
+using System;
+class Person { public int Age; public C Obj = new C(); public Person(int a) { Age = a; } public void Birthday() { Age++; } }
+class C { public int V; }
+class P
+{
+    static Ref<int> Escape()
+    {
+        int x = 1;
+        var r = Ref<int>.Of(in x); // error: CS9912
+        return r;
+    }
+
+    static void Main()
+    {
+        mut var p = new Person(20);
+        var r = Ref<Person>.Of(in p);
+        r.Age = 5; // error: CS9917
+        r.Birthday(); // error: CS9918
+        var o = r.Obj; // error: CS9902
+        p.Age = 3; // error: CS9907
+        Console.WriteLine(r.Age);
+    }
+}

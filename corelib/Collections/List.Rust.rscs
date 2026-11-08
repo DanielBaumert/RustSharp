@@ -68,6 +68,6 @@ namespace System.Collections.Generic
             while (other.Len > 0) Add(other.Remove(0));
         }
 
-        public readonly System.Linq.Query<T, System.Linq.SliceIter<T>> Iter() => new System.Linq.Query<T, System.Linq.SliceIter<T>>(new System.Linq.SliceIter<T>(_items, _count));
+        public readonly System.Linq.Query<Ref<T>, System.Linq.SliceIter<T>> Iter() => new System.Linq.Query<Ref<T>, System.Linq.SliceIter<T>>(new System.Linq.SliceIter<T>(_items, _count));
     }
 }
