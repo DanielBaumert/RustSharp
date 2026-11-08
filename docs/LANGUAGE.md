@@ -1,11 +1,11 @@
-# RustSharp Sprachreferenz
+# RustSharp Language Reference
 
-RustSharp ist C#-Syntax mit Rusts Regeln. Dieses Dokument beschreibt nur, was sich gegenüber C# ändert. Es
-richtet sich an Leser, die C# kennen. Rust-Kenntnisse helfen, sind aber nicht nötig.
+RustSharp is C# syntax with Rust's rules. This document only describes what differs from C#. It is
+written for readers who know C#; knowing Rust helps but is not required.
 
-## Unveränderlich als Standard
+## Immutable by default
 
-Wie in Rust ändert sich eine Variable nur, wenn sie `mut` trägt:
+As in Rust, a variable only changes if it is declared `mut`:
 
 ```csharp
 int a = 1;
@@ -14,105 +14,107 @@ mut int b = 1;
 b++;                          // ok
 
 var list = new List<int>();
-list.Add(1);                  // CS9929: Add braucht exklusiven Zugriff
+list.Add(1);                  // CS9929: Add needs exclusive access
 mut var grow = new List<int>();
 grow.Add(1);                  // ok
 ```
 
-`mut` steht vor dem Typ und geht überall, wo eine Variable entsteht: lokal, in `for`, in
-`foreach (mut var x in list)`, bei Parametern (`int F(mut int x)`), in Lambdas (`(mut int v) => ...`) und in
-Patterns. Es gehört zur Variable, nicht zum Wert: Ein Move in eine `mut`-Variable macht einen Wert
-veränderlich.
+`mut` goes before the type and works wherever a variable is introduced: locals, `for`,
+`foreach (mut var x in list)`, parameters (`int F(mut int x)`), lambdas (`(mut int v) => ...`) and
+patterns. It belongs to the variable, not to the value: moving a value into a `mut` variable makes it
+mutable.
 
-- `CS9928`: eine zweite Zuweisung. Spätes Initialisieren bleibt erlaubt: `int x; if (c) x = 1; else x = 2;`
-- `CS9929`: Feldzuweisung, exklusiver Borrow oder ein Methodenaufruf ohne `readonly`. Das gilt auch für
-  Klassen: Sie gehören ihrer Variable.
-- Eine Closure, die eine Variable ändert, braucht diese als `mut`. Ein `[Mut]`-Delegate wie `Func<A, R>`
-  braucht zum Aufrufen selbst `mut`, genau wie `let mut f` für `FnMut`.
-- Ein Parameter `ref int x` ist unveränderlich, was er referenziert, nicht. `out`-Argumente zählen als
-  erste Zuweisung.
+- `CS9928`: a second assignment. Late initialization is still allowed: `int x; if (c) x = 1; else x = 2;`
+- `CS9929`: a field assignment, an exclusive borrow, or a call to a method that is not `readonly`. This
+  applies to classes too: they belong to their variable.
+- A closure that changes a variable needs that variable to be `mut`. A `[Mut]` delegate such as
+  `Func<A, R>` must itself be `mut` to be called, just like `let mut f` for `FnMut`.
+- A parameter `ref int x` is immutable; what it refers to is not. `out` arguments count as the first
+  assignment.
 
-Der Compiler nennt in der Meldung Zeile und Spalte für das `mut`. `tools/migrate_mut.py` trägt es in
-bestehendem Code automatisch ein.
+The compiler's message gives the line and column where `mut` belongs. `tools/migrate_mut.py` adds it to
+existing code automatically.
 
-Shadowing wie Rusts `let`: `var x = 5; var x = x + 1;` deklariert ein neues `x`, der Initialisierer sieht
-noch das alte. Das geht im selben Block, in inneren Blöcken und über Parametern.
+Shadowing works like Rust's `let`: `var x = 5; var x = x + 1;` declares a new `x`, and the initializer
+still sees the old one. This works in the same block, in inner blocks, over parameters, and in
+top-level statements.
 
 ## Ownership
 
-Jeder Wert hat genau einen Besitzer. Verlässt der Besitzer seinen Scope, wird der Wert freigegeben.
-Lokale Variablen werden in umgekehrter Deklarationsreihenfolge freigegeben, temporäre Werte am Ende
-der Anweisung.
+Every value has exactly one owner. When the owner goes out of scope, the value is dropped. Locals are
+dropped in reverse declaration order, temporaries at the end of the statement.
 
-Zuweisen und Übergeben **verschiebt** einen Wert. Die Quelle ist danach nicht mehr benutzbar:
+Assigning and passing a value **moves** it. The source can no longer be used:
 
 ```csharp
 var a = new Foo();
-var b = a;          // a ist verschoben
+var b = a;          // a is moved
 a.Bar();            // CS9901: borrow of moved value
 ```
 
-Eine verschobene `mut`-Variable lässt sich durch Neuzuweisung wieder verwenden. Eine Zuweisung gibt den
-alten Wert zuerst frei.
+A moved `mut` variable can be used again after a new assignment. An assignment drops the old value
+first.
 
-### Welche Typen kopiert werden
+### Which types are copied
 
-Copy-Typen werden beim Lesen dupliziert, statt verschoben zu werden:
+Copy types are duplicated when read instead of being moved:
 
-- Zahlen, `bool`, `char`, Zeiger und Tupel aus Copy-Typen
-- eigene Structs und Enums mit `[Copy]`, wie `#[derive(Copy)]`; alle Felder müssen Copy sein (`CS9922`)
-- Typparameter mit `where T : unmanaged`
+- numbers, `bool`, `char`, pointers, and tuples of Copy types
+- your own structs and enums marked `[Copy]`, like `#[derive(Copy)]`; all fields must be Copy (`CS9922`)
+- type parameters with `where T : unmanaged`
 
-Ohne `[Copy]` wird auch ein Struct aus lauter Zahlen verschoben, ebenso ein Enum wie `Color`.
+Without `[Copy]`, even a struct made only of numbers is moved, and so is an enum like `Color`.
 
-Alles andere wird verschoben: Klassen, Arrays, Delegates, Interfaces, Structs mit solchen Feldern
-und unbeschränkte Typparameter.
+Everything else is moved: classes, arrays, delegates, interfaces, structs with such fields, and
+unconstrained type parameters.
 
-`string` ist Rusts `String`: UTF-8, `Length` zählt Bytes, `s[i]` gibt es nicht, `Chars()` liefert
-`Rune` (Rusts `char`), `Bytes()` die Bytes. Ein Ausschnitt mitten in einem Zeichen panikt. Mit `mut`
-ändern `Push`, `PushStr`, `Pop`, `Insert`, `Truncate` und `Clear` den String. Ein `Clone()` und der
-Original-String beeinflussen sich nie (Copy-on-Write), auch ein Literal ist bei jeder Verwendung ein
-eigener String. Weitere Methoden: `Find`, `Contains`, `StartsWith`, `EndsWith`, `Trim`, `Split`,
-`Replace`, `Repeat`, `ToUpper`, `ToLower`, `AsPtr`. `fixed` auf einem String geht nicht mehr.
-Zuweisen, Übergeben und `return` verschieben einen String, `Clone()` kopiert.
+`string` is Rust's `String`: UTF-8, `Length` counts bytes, there is no `s[i]`, `Chars()` yields `Rune`
+(Rust's `char`), and `Bytes()` yields the bytes. Slicing in the middle of a character panics. With
+`mut`, `Push`, `PushStr`, `Pop`, `Insert`, `Truncate` and `Clear` change the string. A `Clone()` and the
+original never affect each other (copy-on-write), and a literal is a string of its own at every use.
+More methods: `Find`, `Contains`, `StartsWith`, `EndsWith`, `Trim`, `Split`, `Replace`, `Repeat`,
+`ToUpper`, `ToLower`, `AsPtr`. `fixed` on a string is not supported. Assigning, passing and `return`
+move a string; `Clone()` copies it.
 
-`str` ist Rusts `&str`: ein geborgter Ausschnitt ohne Kopie, Copy, vom Borrow-Checker verfolgt. Ein
-`string` wird implizit zu `str`, ein Literal wird ein `'static str` und darf eine Methode verlassen, auch `"a b".Split(' ')`.
-`s[a..b]`, `s[..5]`, `s[^3..]`, `Trim`, `Slice`, `Split` und `Lines` liefern `str` ohne Kopie, `ToOwned()`
-macht daraus einen `string`. Teile von `Split` leben so lange wie Text und Trenner.
+`str` is Rust's `&str`: a borrowed slice without a copy, Copy, and tracked by the borrow checker. A
+`string` converts to `str` implicitly. A literal becomes a `'static str` and may leave a method, even
+`"a b".Split(' ')`. `s[a..b]`, `s[..5]`, `s[^3..]`, `Trim`, `Slice`, `Split` and `Lines` return `str`
+without copying, and `ToOwned()` turns one into a `string`. The parts from `Split` live as long as both
+the text and the separator.
 
 ```csharp
 static str FirstWord(str s) => s.IndexOf(" ") is var i && i >= 0 ? s.Slice(0, i) : s;
 ```
-Eine Methode, die nur liest, nimmt `in string` (Rusts `&str`). Corelib-Methoden mit einem
-`string`-Parameter, `a + b`, `==`, `$"…"` und `switch` lesen nur und verbrauchen nichts.
 
-### Woraus nicht verschoben werden darf
+A method that only reads takes `in string` (Rust's `&str`). Core-library methods with a `string`
+parameter, `a + b`, `==`, `$"…"` and `switch` only read and consume nothing.
 
-| Quelle | Fehler | Stattdessen |
+### What cannot be moved out of
+
+| Source | Error | Instead |
 |---|---|---|
-| hinter `ref`, `in` oder `this` | CS9902 | `Mem.Replace`, `Option.Take()`, oder borgen |
-| Array-Element | CS9903 | `Mem.Replace(ref a[i], neu)`, bei einer Liste `RemoveAt(i)` |
-| `static`-Feld | CS9904 | `Mem.Replace` oder `Option.Take()` in einem `unsafe`-Block |
-| Feld eines Typs mit Destruktor | CS9905 | `Mem.Replace`, oder das Feld als `T?` und `Take()` |
+| behind `ref`, `in` or `this` | CS9902 | `Mem.Replace`, `Option.Take()`, or borrow |
+| an array element | CS9903 | `Mem.Replace(ref a[i], replacement)`, or `RemoveAt(i)` on a list |
+| a `static` field | CS9904 | `Mem.Replace` or `Option.Take()` in an `unsafe` block |
+| a field of a type with a destructor | CS9905 | `Mem.Replace`, or make the field `T?` and call `Take()` |
 
-`Mem.Take` verlangt wie Rusts `mem::take` ein `Default`: `where T : IDefault<T>` (sonst `CS0311`). Es lässt
-`T.Default()` zurück, nie eine Null.
+Like Rust's `mem::take`, `Mem.Take` needs a `Default`: `where T : IDefault<T>` (otherwise `CS0311`). It
+leaves `T.Default()` behind, never a null.
 
-Aus einem eigenen Objekt dürfen einzelne Felder verschoben werden (Partial Move). Die übrigen Felder
-werden dann normal freigegeben, das Objekt als Ganzes ist aber nicht mehr benutzbar.
+Individual fields may be moved out of an object you own (a partial move). The remaining fields are
+dropped normally, but the object as a whole can no longer be used.
 
 ## Borrows
 
-C#-Referenzen sind Borrows:
+C# references are borrows:
 
 ```csharp
-void Read(in Foo x)   { }     // shared: lesen, beliebig viele gleichzeitig
-void Edit(ref Foo x)  { }     // exklusiv: schreiben, nur einer zur selben Zeit
+void Read(in Foo x)   { }     // shared: read-only, any number at the same time
+void Edit(ref Foo x)  { }     // exclusive: may write, only one at a time
 ```
 
-Es gilt die Rust-Regel: **entweder beliebig viele Shared-Borrows oder genau ein exklusiver.** Das
-verhindert zum Beispiel, dass eine Liste wächst, während eine Referenz in ihren Puffer zeigt:
+Rust's rule applies: **either any number of shared borrows or exactly one exclusive borrow.** This
+prevents, for example, a list from growing while a reference points into its buffer:
 
 ```csharp
 ref int first = ref list[0];
@@ -120,48 +122,48 @@ list.Add(2);                  // CS9911
 first = 3;
 ```
 
-Ein Borrow endet mit seiner letzten Verwendung, nicht am Ende des Scopes (Non-Lexical Lifetimes).
-Dieser Code ist also gültig:
+A borrow ends at its last use, not at the end of the scope (non-lexical lifetimes). So this code is
+valid:
 
 ```csharp
 ref int r = ref a;
 r = 10;
-a = 11;                       // ok: r wird nicht mehr benutzt
+a = 11;                       // ok: r is not used anymore
 ```
 
-Verschiedene Felder dürfen gleichzeitig geborgt werden. Verschiedene Array-Elemente zählen dagegen
-als derselbe Speicher.
+Different fields may be borrowed at the same time. Different array elements, however, count as the
+same memory.
 
-Hinter einer Shared-Referenz ist alles unveränderlich, auch tief verschachtelt: Über `in Foo x` ist
-`x.Bar.Baz = 1` ein Fehler (CS9917).
+Everything behind a shared reference is immutable, however deeply nested: through `in Foo x`,
+`x.Bar.Baz = 1` is an error (CS9917).
 
-### Der Empfänger `this`
+### The receiver `this`
 
-| Deklaration | `this` ist | Rust |
+| Declaration | `this` is | Rust |
 |---|---|---|
-| `void M()` | exklusiver Borrow | `&mut self` |
-| `readonly void M()` | Shared-Borrow | `&self` |
-| `move void M()` | Wert, wird verbraucht | `self` |
+| `void M()` | an exclusive borrow | `&mut self` |
+| `readonly void M()` | a shared borrow | `&self` |
+| `move void M()` | a value that is consumed | `self` |
 
-`get`-Accessoren sind automatisch `readonly`, außer sie liefern `ref T`. Konstruktoren und
-Destruktoren borgen `this` exklusiv.
+`get` accessors are `readonly` automatically, unless they return `ref T`. Constructors and destructors
+borrow `this` exclusively.
 
-Overrides und Interface-Implementierungen müssen zur Deklaration passen (CS9920). `readonly` darf
-eine normale Methode ersetzen, weil es mehr verspricht. Umgekehrt geht das nicht, und `move` muss
-auf beiden Seiten gleich sein.
+Overrides and interface implementations must match their declaration (CS9920). `readonly` may replace
+an ordinary method because it promises more. The reverse is not allowed, and `move` must be the same on
+both sides.
 
-Argumente werden vor dem Borgen des Empfängers ausgewertet, also ist `list.Add(list.Count)` gültig.
+Arguments are evaluated before the receiver is borrowed, so `list.Add(list.Count)` is valid.
 
 ## Lifetimes
 
-Meist sind keine Angaben nötig, die Regeln entsprechen Rusts Elision:
+Usually no annotations are needed; the rules match Rust's elision:
 
-1. Eine Methode, die `this` borgt, gibt einen Borrow aus `this` zurück.
-2. Sonst stammt das Ergebnis aus der einzigen Eingabe, die eine Referenz trägt.
-3. Mehrere Kandidaten ohne Angabe sind ein Fehler (CS9916).
+1. A method that borrows `this` returns a borrow from `this`.
+2. Otherwise the result comes from the only input that carries a reference.
+3. Several candidates without an annotation are an error (CS9916).
 
-Eingaben, aus denen das Ergebnis nicht stammt, lassen sich mit `scoped` ausschließen. Mehrdeutige
-Fälle bekommen einen Namen. Lifetimes werden nicht deklariert, ein Name gilt pro Signatur:
+Inputs the result does not come from can be excluded with `scoped`. Ambiguous cases get a name.
+Lifetimes are not declared; a name is valid for one signature:
 
 ```csharp
 static ref 'a int Larger(ref 'a int x, ref 'a int y) { ... }
@@ -169,13 +171,12 @@ static ref int First(ref int x, scoped ref int y) => ref x;
 static 'a View Make(ref 'a int x, ref int y) { ... }
 ```
 
-`'a` wird nur dann als Lifetime gelesen, wenn kein schließendes Hochkomma folgt. `'a'` bleibt ein
-Zeichenliteral.
+`'a` is only read as a lifetime when no closing quote follows. `'a'` stays a character literal.
 
-### Ref Structs
+### Ref structs
 
-Ein `ref struct` darf Borrows enthalten und hat eine implizite Lifetime. Er lebt nie länger als die
-Daten, die er referenziert:
+A `ref struct` may contain borrows and has an implicit lifetime. It never outlives the data it refers
+to:
 
 ```csharp
 ref struct View
@@ -186,110 +187,106 @@ ref struct View
 }
 
 var v = new View(ref k);
-k = 2;                 // CS9907, solange v noch benutzt wird
+k = 2;                 // CS9907 while v is still used
 ```
 
-Ein `ref struct` ist nicht Copy, ein `readonly ref struct` schon.
+A `ref struct` is not Copy; a `readonly ref struct` is.
 
-## Destruktoren
+## Destructors
 
-`~T()` läuft deterministisch, wenn der Besitzer den Wert freigibt, und zwar genau einmal. Bei
-Klassen laufen zuerst alle Destruktoren von der abgeleiteten Klasse zur Basisklasse. Danach werden
-die Felder in Deklarationsreihenfolge freigegeben, die Felder der Basisklasse zuerst.
+`~T()` runs deterministically when the owner drops the value, exactly once. For classes, all
+destructors run first, from the derived class to the base class. Then the fields are dropped in
+declaration order, the base class's fields first.
 
-Auch Structs dürfen Destruktoren haben. Er läuft nur für Werte, die mit `new` erzeugt wurden. Ein
-`default(T)` gilt als leer und löst ihn nicht aus.
+Structs may have destructors too. One runs only for values created with `new`. A `default(T)` of a
+struct without references counts as empty and does not trigger it.
 
-`using` und `IDisposable` funktionieren wie gewohnt und sind von Destruktoren unabhängig.
+`using` and `IDisposable` work as usual and are independent of destructors.
 
-## Kein `null`: `Option<T>`
+## No `null`: `Option<T>`
 
-Wie in Rust gibt es kein `null`. Ein `string`, eine Klasse oder ein Array hat immer einen Wert. Ein Wert,
-der fehlen kann, ist ein `Option<T>`, und `T?` ist nur eine Kurzschreibweise dafür, für Klassen wie
-für Structs: `string?` ist `Option<string>`, `int?` ist `Option<int>`.
+As in Rust, there is no `null`. A `string`, a class or an array always has a value. A value that may be
+missing is an `Option<T>`, and `T?` is only a short way to write it, for classes and structs alike:
+`string?` is `Option<string>`, `int?` is `Option<int>`.
 
 ```csharp
 static int? Digit(char c) => c >= '0' && c <= '9' ? Some(c - '0') : None;
 
 static string Show(int? d) => d switch
 {
-    Some(var v) => "Ziffer " + v.ToString(),
-    None => "keine",
+    Some(var v) => "digit " + v.ToString(),
+    None => "none",
 };
 
 static int? Sum(string s)
 {
     mut int sum = 0;
-    foreach (var c in s.Chars()) sum += Digit(c)?;   // None wird weitergereicht
+    foreach (var c in s.Chars()) sum += Digit(c)?;   // None is passed on
     return Some(sum);
 }
 ```
 
-- `Some(x)` und `None` kommen aus dem Prelude (`System.Option`), wie in Rust. `None` passt zu jedem
-  `Option<T>`; ausgeschrieben ist es `Option<T>.None`.
-- An den Wert kommt man nur nach einer Prüfung: `if (o is Some(var v))`, ein `switch` mit `Some(var v)` und
-  `None` (er muss beide abdecken, `CS8509`), oder `Unwrap()`, `Expect(msg)`, die bei `None` ausdrücklich
-  paniken. `IsSome`, `IsNone`, `UnwrapOr`, `Map`, `AndThen` und die übrigen Methoden stehen unten.
-- `x?` reicht `None` aus einer Methode weiter, die selbst ein `Option` zurückgibt. `x?.M()` ruft danach ein
-  Member auf.
-- `T` wird nie von selbst zu `Option<T>`: `int? i = 5;` ist ein Fehler, richtig ist `Some(5)`.
-- Patterns auf einem geborgten Option gehen über `AsRef()`: `o.AsRef() is Some(var r)` gibt ein `Ref<T>`,
-  `o.AsMut()` ein `RefMut<T>`, durch das man ohne `mut` schreiben kann. `Some(var v)` direkt auf `o`
-  verschiebt den Wert heraus, wie Rusts `match o { Some(v) => ... }`.
+- `Some(x)` and `None` come from the prelude (`System.Option`), as in Rust. `None` fits any `Option<T>`;
+  written out, it is `Option<T>.None`.
+- The value is only reachable after a check: `if (o is Some(var v))`, a `switch` with `Some(var v)` and
+  `None` (it must cover both, `CS8509`), or `Unwrap()` and `Expect(msg)`, which panic explicitly on
+  `None`. `IsSome`, `IsNone`, `UnwrapOr`, `Map`, `AndThen` and the other methods are listed below.
+- `x?` passes `None` on out of a method that itself returns an `Option`. `x?.M()` then calls a member.
+- A `T` never turns into an `Option<T>` by itself: `int? i = 5;` is an error; write `Some(5)`.
+- Patterns on a borrowed Option go through `AsRef()`: `o.AsRef() is Some(var r)` gives a `Ref<T>`, and
+  `o.AsMut()` a `RefMut<T>` that can be written through without `mut`. `Some(var v)` directly on `o`
+  moves the value out, like Rust's `match o { Some(v) => ... }`.
 
-Im Benutzercode ist alles verboten, was ein `null` erzeugt oder voraussetzt:
+Everything that creates or presupposes a `null` is rejected:
 
-| Geschrieben | Fehler | Stattdessen |
+| Written | Error | Instead |
 |---|---|---|
 | `null` | CS9935 | `None`, `Some(x)` |
-| `x!`, `a ?? b`, `a ??= b`, `x?.M()` auf einer Referenz, `x as T` | CS9937 | `Unwrap()`, `UnwrapOr(b)`, `GetOrInsert(b)`, `.`, `x is T v` |
-| `default` für einen Typ, der Referenzen enthält | CS9938 | `None`, oder `T.Default()` mit `where T : IDefault<T>` |
-| `new string[n]`, `new S()` ohne eigenen Konstruktor | CS9938 | Elemente aufzählen, `List<T>`, Konstruktor oder Initialisierer |
-| `Mem.Take(ref slot)` ohne `IDefault<T>` | CS0311 | `RemoveAt(i)`, `Pop()`, `Mem.Replace`, `Option.Take()` |
-| `#nullable` | CS9936 | Zeile entfernen |
+| `x!`, `a ?? b`, `a ??= b`, `x?.M()` on a reference, `x as T` | CS9937 | `Unwrap()`, `UnwrapOr(b)`, `GetOrInsert(b)`, `.`, `x is T v` |
+| `default` for a type that contains references | CS9938 | `None`, or `T.Default()` with `where T : IDefault<T>` |
+| `new string[n]`, `new S()` without a constructor of its own | CS9938 | list the elements, `List<T>`, a constructor or an initializer |
+| `Mem.Take(ref slot)` without `IDefault<T>` | CS0311 | `RemoveAt(i)`, `Pop()`, `Mem.Replace`, `Option.Take()` |
+| `#nullable` | CS9936 | remove the line |
 
-Felder brauchen einen Wert (`CS8618`): im Konstruktor, als Initialisierer, oder als `T? x = None`.
-`unsafe`-Code darf Nullzeiger benutzen (`p == null` auf `int*`), wie Rusts `ptr::null`, aber keine
-Nullreferenzen.
+Fields need a value (`CS8618`): in the constructor, as an initializer, or as `T? x = None`. `unsafe`
+code may use null pointers (`p == null` on an `int*`), like Rust's `ptr::null`, but no null references.
 
-Dieselben Regeln gelten für die Corelib: Sie hat kein `#nullable`, kein `null` außer für rohe Zeiger und
-keine genullten Werte. Wo ein Wert fehlen kann, steht ein `Option`: das Ergebnis eines Tasks, ein
-wartender `Waker`, das Feld eines Generators. `Result` besteht aus zwei `Option`-Feldern, von denen genau
-eines `Some` ist. Der leere Teil eines `None` ist uninitialisierter Speicher, den niemand liest, wie in
-Rust. `StringBuilder.Append` gibt wie Rusts `push_str` nichts zurück.
+The same rules apply to the core library: it has no `#nullable`, no `null` except for raw pointers, and
+no zeroed values. Where a value may be missing, there is an `Option`: the result of a task, a waiting
+`Waker`, the field of a generator. `Result` consists of two `Option` fields, exactly one of which is
+`Some`. The empty part of a `None` is uninitialized memory that nobody reads, as in Rust.
+`StringBuilder.Append` returns nothing, like Rust's `push_str`.
 
-APIs, bei denen ein Wert fehlen kann, liefern `Option` oder `Result`: `Console.ReadLine()` (`None` am
-Ende der Eingabe), `list.Get(i)`, `list.Pop()`, `dict.Get(k)`, `First()`, `rx.ReceiveAsync()` (`None`,
-wenn alle Sender weg sind), `stream.ReadLineAsync()` (`Result<Option<string>, IoError>`) und
-`int.Parse(s)` (`Result<int, ParseError>`). Indexer wie `list[i]` paniken wie in Rust.
+APIs where a value may be missing return `Option` or `Result`: `Console.ReadLine()` (`None` at the end
+of the input), `list.Get(i)`, `list.Pop()`, `dict.Get(k)`, `First()`, `rx.ReceiveAsync()` (`None` once all
+senders are gone), `stream.ReadLineAsync()` (`Result<Option<string>, IoError>`) and `int.Parse(s)`
+(`Result<int, ParseError>`). Indexers such as `list[i]` panic, as in Rust.
 
-Ein `switch`-Ausdruck muss alle Fälle abdecken wie Rusts `match` (`CS8509`). Ein `enum` kann in C#
-auch unbenannte Werte tragen: Sind alle benannten Werte abgedeckt, kompiliert der Ausdruck, und ein
-unbenannter Wert wirft zur Laufzeit
-`SwitchExpressionException`.
+A `switch` expression must cover every case, like Rust's `match` (`CS8509`). A C# `enum` can also hold
+unnamed values: if all named values are covered, the expression compiles, and an unnamed value throws
+`SwitchExpressionException` at run time.
 
-## Pattern Matching
+## Pattern matching
 
-Pattern-Variablen borgen vom geprüften Wert:
+Pattern variables borrow from the value being tested:
 
 ```csharp
-if (shape is Circle c) c.Radius = 2;   // shape bleibt der Besitzer
+if (shape is Circle c) c.Radius = 2;   // shape stays the owner
 ```
 
-Solange `c` benutzt wird, ist `shape` geborgt. Aus `c` zu verschieben ist ein Fehler. Um das Objekt
-tatsächlich zu übernehmen, dient ein Cast: `var c = (Circle)shape;`. Der Cast verbraucht `shape`.
-`as` gibt es nicht (`CS9937`), weil es bei einem Fehlschlag `null` liefern würde.
+As long as `c` is used, `shape` is borrowed. Moving out of `c` is an error. To actually take over the
+object, use a cast: `var c = (Circle)shape;`. The cast consumes `shape`. There is no `as` (`CS9937`),
+because it would give `null` when it fails.
 
-## Anonyme Typen
+## Anonymous types
 
-Felder anonymer Typen werden direkt gelesen und folgen den normalen Regeln: Copy-Werte und Strings
-lassen sich beliebig oft lesen, ein Objekt wird beim Lesen herausverschoben (`var x = a.Obj;`).
+Fields of anonymous types are read directly and follow the normal rules: Copy values and strings can be
+read any number of times, and an object is moved out when it is read (`var x = a.Obj;`).
 
 ## foreach
 
-`foreach` über Arrays und `List<T>` borgt die Sammlung. Für Copy-Elemente funktioniert es wie
-gewohnt. Andere Elemente müssen als Referenz durchlaufen werden, weil sie sonst aus der Sammlung
-verschoben würden:
+`foreach` over arrays and `List<T>` borrows the collection. For Copy elements it works as usual. Other
+elements must be iterated by reference, because otherwise they would be moved out of the collection:
 
 ```csharp
 foreach (ref readonly var node in nodes) Console.WriteLine(node.Value);
@@ -297,101 +294,98 @@ foreach (ref readonly var node in nodes) Console.WriteLine(node.Value);
 
 ## Clone
 
-Nichts wird implizit tief kopiert. Wer eine Kopie braucht, ruft `x.Clone()` auf. Das geht für Copy-Typen,
-Strings, Arrays von klonbaren Elementen und Typen, die es erlauben:
+Nothing is deep-copied implicitly. If you need a copy, call `x.Clone()`. This works for Copy types,
+strings, arrays of cloneable elements, and types that allow it:
 
 ```csharp
-[Clone] class Node { public int V; public Node Next; }   // Feld für Feld, wie #[derive(Clone)]
-class Shape : IClone<Shape> { public readonly Shape Clone() => ...; }   // eigene Implementierung
+[Clone] class Node { public int V; public Node? Next = None; }   // field by field, like #[derive(Clone)]
+class Shape : IClone<Shape> { public readonly Shape Clone() => ...; }   // a custom implementation
 ```
 
-Ein Typ ohne Clone ergibt `CS9922`. Geklont wird immer der dynamische Typ, auch hinter einer
-Basisklasse.
+A type without Clone gives `CS9922`. The dynamic type is always cloned, even behind an interface.
 
 ## Records
 
-Records sind automatisch klonbar und vergleichbar. `with` klont, `==` vergleicht strukturell und borgt
-beide Seiten, `ToString` liefert `Point { X = 1, Name = a }`.
+Records are cloneable and comparable automatically. `with` clones, `==` compares structurally and
+borrows both sides, and `ToString` gives `Point { X = 1, Name = a }`.
 
-Eigenschaften mit einem Typ ohne Copy werden wie Felder gelesen: `var y = r.Y;` verschiebt den Wert aus
-dem Record. Eine Destrukturierung `var (a, b) = r;` verbraucht `r`, wenn eines der Felder verschoben
-werden muss.
+Properties whose type is not Copy are read like fields: `var y = r.Y;` moves the value out of the
+record. A deconstruction `var (a, b) = r;` consumes `r` if one of the fields has to be moved.
 
 ## Traits
 
-Es gibt keine Vererbung (`CS9934`): Eine Klasse implementiert nur Interfaces. Gemeinsames Verhalten
-gehört in einen Trait mit Default-Methoden, eine feste Menge von Fällen in ein Enum mit Daten.
-`ToString`, `Equals` und `GetHashCode` dürfen überschrieben werden, wie `Display` und `PartialEq`.
+There is no inheritance (`CS9934`): a class only implements interfaces. Shared behaviour belongs in a
+trait with default methods, and a fixed set of cases in an enum with data. `ToString`, `Equals` and
+`GetHashCode` may be overridden, like `Display` and `PartialEq`.
 
-Varianten entstehen wie in Rust ohne `new`: `Abx.A`, `Shape.Circle(2)` (`new` geht auch).
+Variants are created without `new`, as in Rust: `Abx.A`, `Shape.Circle(2)` (`new` works too).
 
-Ein Enum implementiert einen Trait wie Rusts `impl Trait for Enum`: `enum Abx : ICool<int> { A, B, C; public
-readonly int a() => …; }`. Ein Enum mit Trait, mit Methoden nach `;` oder mit Daten ist ein Rust-Enum (wird
-verschoben), sonst ein C#-Enum mit Zahlenwerten.
+An enum implements a trait like Rust's `impl Trait for Enum`:
+`enum Abx : ICool<int> { A, B, C; public readonly int a() => …; }`. An enum with a trait, with methods
+after `;`, or with data is a Rust enum (and is moved); otherwise it is a C# enum with numeric values.
 
-Interfaces sind Traits. Eine Methode sagt wie in Rust, wie sie `self` nimmt: `readonly` ist `&self`,
-ohne Modifikator `&mut self`, `move` ist `self`. Implementierungen müssen das einhalten (`CS9920`).
+Interfaces are traits. As in Rust, a method states how it takes `self`: `readonly` is `&self`, no
+modifier is `&mut self`, and `move` is `self`. Implementations must respect this (`CS9920`).
 
 ```csharp
 interface IGreet
 {
     readonly string Name();
-    readonly string Hello() => "Hello " + Name();   // Default-Methode
+    readonly string Hello() => "Hello " + Name();   // a default method
 }
-static string Say<T>(in T x) where T : IGreet => x.Hello();   // Bound wie `T: Greet`
+static string Say<T>(in T x) where T : IGreet => x.Hello();   // a bound like `T: Greet`
 static T Make<T>() where T : IDefault<T> => T.Default();      // `T::default()`
 ```
 
 ## Lambdas
 
-Eine Lambda borgt, was sie benutzt, und zwar pro Variable: lesend, wenn sie nur liest, exklusiv, wenn
-sie schreibt.
+A lambda borrows what it uses, per variable: shared if it only reads, exclusive if it writes.
 
 ```csharp
 mut int a = 1, b = 2;
 G incA = () => { a++; };
-G incB = () => { b++; };       // ok: eine andere Variable
-int read = a;                  // CS9908, solange incA noch benutzt wird
+G incB = () => { b++; };       // ok: a different variable
+int read = a;                  // CS9908 while incA is still used
 ```
 
-Eine Closure darf ihre Variablen nicht überleben. Ein `move`-Lambda übernimmt sie deshalb:
+A closure must not outlive its variables. A `move` lambda therefore takes them over:
 
 ```csharp
-static F MakeAdder(int n) => move x => x + n;     // ohne move: CS9925
+static F MakeAdder(int n) => move x => x + n;     // without move: CS9925
 ```
 
-Delegates tragen die Lifetime dessen, was sie borgen. Wo ein Delegate gespeichert wird, etwa in einem
-Feld oder einer Liste, muss er ohne Borrows auskommen. Das sagt die Signatur mit `'static`:
+Delegates carry the lifetime of what they borrow. Where a delegate is stored, for example in a field or
+a list, it must not borrow anything. The signature says so with `'static`:
 
 ```csharp
 class Button { F _click; public Button('static F click) { _click = click; } }
 ```
 
-Ein `move`-Lambda darf ihre Captures nur verbrauchen, wenn der Delegate-Typ `[Once]` trägt. Der Aufruf
-verbraucht dann den Delegate selbst, ein zweiter Aufruf ist `CS9900`. Das entspricht `FnOnce`.
+A `move` lambda may only consume its captures if the delegate type is marked `[Once]`. Calling it then
+consumes the delegate itself, and a second call is `CS9900`. This corresponds to `FnOnce`.
 
-Ein Delegate-Typ mit `[Mut]` entspricht `FnMut`: Nur solche Delegates dürfen ihre Captures ändern, und
-ihr Aufruf braucht exklusiven Zugriff (`CS9927`).
+A delegate type marked `[Mut]` corresponds to `FnMut`: only such delegates may change their captures,
+and calling one needs exclusive access (`CS9927`).
 
 ## LINQ
 
-LINQ funktioniert direkt auf Listen und Arrays, auch in Query-Syntax. Es ist lazy, wird monomorphisiert
-und borgt die Sammlung. Lambdas bekommen die Elemente per `in` geliehen:
+LINQ works directly on lists and arrays, also in query syntax. It is lazy, monomorphized, and borrows the
+collection. Lambdas receive the elements as `in` borrows:
 
 ```csharp
 var names = people.Where(p => p.Age >= 18).Select(p => p.Name).ToList();
 var squares = from x in nums where x < 4 select x * x;
 ```
 
-Eine Query darf nur einmal durchlaufen werden. `ToList`, `First` und ähnliche Methoden klonen ihre
-Ergebnisse, die Elemente brauchen also Clone. Solange eine Query lebt, ist die Sammlung geborgt.
-Sammlungen ohne direkten `Where`-Einstieg erreichen die übrigen Methoden über `AsQuery()`.
+A query may only be iterated once. `ToList`, `First` and similar methods clone their results, so the
+elements need Clone. As long as a query is alive, the collection is borrowed. Collections without a
+direct `Where` entry point reach the other methods through `AsQuery()`.
 
-## Iteratoren
+## Iterators
 
-`yield return` funktioniert wie gewohnt und erzeugt eine Coroutine. `foreach` verbraucht die Sequenz:
-Ein zweiter Durchlauf derselben Variable ist `CS9900`. Eine Iterator-Methode auf einer Instanz borgt
-`this`, solange die Sequenz lebt.
+`yield return` works as usual and creates a coroutine. `foreach` consumes the sequence: iterating the
+same variable a second time is `CS9900`. An iterator method on an instance borrows `this` as long as the
+sequence is alive.
 
 ## Threads
 
@@ -404,26 +398,25 @@ var t = Thread.Run(move () =>
     guard.Value = guard.Value + 1;
     return 0;
 });
-t.Join().Unwrap();   // Err, wenn der Thread mit einem Panic endete
+t.Join().Unwrap();   // Err if the thread ended with a panic
 ```
 
-Jeder Typ ist automatisch `Send` (darf in einen anderen Thread wandern) und `Sync` (darf von mehreren
-Threads geteilt werden), wenn seine Felder es sind. Rohzeiger, `Rc<T>`, `object` und Interfaces sind
-es nicht. Verstöße ergeben `CS9923` und `CS9924`. Eigene Typen mit `unsafe` im Inneren geben ihre Regel
-mit `[SendWhen]` und `[SyncWhen]` an.
+Every type is automatically `Send` (may move to another thread) and `Sync` (may be shared between
+threads) if its fields are. Raw pointers, `Rc<T>`, `object` and interfaces are not. Violations give
+`CS9923` and `CS9924`. Your own types with `unsafe` inside state their rule with `[SendWhen]` and
+`[SyncWhen]`.
 
-Eine Closure für `Thread.Run` oder `Task.Run` muss ein `move`-Lambda sein. Ein `Mutex<T>` besitzt seine
-Daten, sie sind nur über den Guard erreichbar, und der Guard gibt die Sperre am Scope-Ende frei.
+A closure for `Thread.Run` or `Task.Run` must be a `move` lambda. A `Mutex<T>` owns its data, which is
+only reachable through the guard, and the guard releases the lock at the end of its scope.
 
-Zur Verfügung stehen `Arc<T>`, `WeakArc<T>`, `Mutex<T>`, `RwLock<T>`, `RefCell<T>`, `Condvar`, `Barrier`,
-`Lazy<T>`, `AtomicInt`, `AtomicLong`, `AtomicBool`, `Channel` und `ThreadScope` für Threads, die lokale
-Daten borgen. `lock (x)` geht nur auf `System.Threading.Lock`, das keine Daten schützt; `Mutex<T>` ist
-vorzuziehen.
+Available are `Arc<T>`, `WeakArc<T>`, `Mutex<T>`, `RwLock<T>`, `RefCell<T>`, `Condvar`, `Barrier`,
+`Lazy<T>`, `AtomicInt`, `AtomicLong`, `AtomicBool`, `Channel`, and `ThreadScope` for threads that borrow
+local data. `lock (x)` only works on `System.Threading.Lock`, which protects no data; prefer `Mutex<T>`.
 
-Veränderliche `static`-Felder verlangen wegen möglicher Data Races `unsafe` (`CS9921`). `readonly static`
-ist frei lesbar, muss aber `Sync` sein und ist auch im Inneren unveränderlich.
+Mutable `static` fields require `unsafe` because of possible data races (`CS9921`). A `readonly static`
+field can be read freely, but it must be `Sync` and is immutable inside as well.
 
-## async und await
+## async and await
 
 ```csharp
 static async Task<int> Add(int a, int b)
@@ -436,49 +429,49 @@ var handle = Task.Run(move () => Add(1, 2));
 Console.WriteLine(await handle);
 ```
 
-Die Schreibweise ist C#, das Verhalten ist Rust:
+The syntax is C#, the behaviour is Rust:
 
-- **Tasks sind lazy.** Eine `async`-Methode läuft erst, wenn jemand sie mit `await` oder `Task.Run` antreibt.
-- **`await` verbraucht den Task.**
-- **Tasks lassen sich abbrechen, indem man sie freigibt.** Lokale Werte werden dabei freigegeben.
-- **`await handle` liefert `Result<T, JoinError>`**, wie in Tokio: `Err`, wenn der Task mit einem
-  Panic endete oder abgebrochen wurde.
-- **Ein Task borgt, was seine Methode borgt.** Eine `async`-Instanzmethode borgt `this`, solange der Task lebt.
-- **`Task.Run` verteilt auf Worker-Threads.** Freie Worker stehlen wartende Tasks. Nur die Closure und
-  ihr Ergebnis müssen `Send` sein: Hält der Zustand eines Tasks etwas, das nicht `Send` ist, etwa ein
-  `Rc<T>`, bleibt der Task ab dem ersten Poll auf seinem Thread.
-- **Kooperatives Budget.** Nach 128 sofort bereiten I/O-Operationen gibt ein Task den Worker frei.
-- **Programmende.** Endet `async Main`, werden noch lebende Tasks abgebrochen und freigegeben.
-- **Sperren dürfen nicht über ein `await` gehalten werden** (`CS9926`).
+- **Tasks are lazy.** An `async` method only runs once something drives it with `await` or `Task.Run`.
+- **`await` consumes the task.**
+- **Tasks are cancelled by dropping them.** Their locals are dropped along with them.
+- **`await handle` gives `Result<T, JoinError>`**, as in Tokio: `Err` if the task ended with a panic or
+  was aborted.
+- **A task borrows what its method borrows.** An `async` instance method borrows `this` as long as the
+  task is alive.
+- **`Task.Run` spreads work over worker threads.** Idle workers steal waiting tasks. Only the closure and
+  its result must be `Send`: if a task's state holds something that is not `Send`, such as an `Rc<T>`,
+  the task stays on its thread from the first poll on.
+- **Cooperative budget.** After 128 I/O operations that were ready immediately, a task yields the worker.
+- **End of the program.** When `async Main` ends, tasks that are still alive are cancelled and dropped.
+- **Locks must not be held across an `await`** (`CS9926`).
 
-Außerdem gibt es `Task.Yield`, `Task.FromResult`, `Task.WhenAll` und `async Task Main`. Für eigene
-Leaf-Futures steht `Runtime.CurrentWaker()` bereit.
+There are also `Task.Yield`, `Task.FromResult`, `Task.WhenAll` and `async Task Main`. For your own leaf
+futures, `Runtime.CurrentWaker()` is available.
 
-### Tokio-Bausteine
+### Tokio building blocks
 
-| Baustein | Bedeutung |
+| Building block | Meaning |
 |---|---|
-| `Task.Run` | Liefert einen `JoinHandle<T>`. Freigeben entkoppelt den Task, `Abort()` bricht ihn ab. |
-| `Task.RunBlocking` | Blockierender Code auf einem eigenen Thread |
-| `Task.WhenAny`, `Task.Race` | Der Erste gewinnt, die anderen werden abgebrochen |
-| `Task.Timeout(task, ms)` | Bricht ab und liefert `Err(Elapsed)` |
-| `Interval` | Gleichmäßiger Takt: `await tick.TickAsync()` |
-| `AsyncMutex<T>` | Der Guard darf über `await` gehalten werden, Klone teilen die Daten |
-| `Semaphore` | `await s.AcquireAsync()`, das Freigeben des Permit gibt ihn zurück |
-| `Channel.CreateBounded<T>(n)` | `await tx.SendAsync(v)` wartet bei vollem Kanal |
-| `rx.ReceiveAsync()` | Liefert `Option<T>`, `None`, wenn alle Sender weg sind: `while (await rx.ReceiveAsync() is Some(var v))` |
-| `TaskCompletionSource<T>` | Ein von Hand abgeschlossener Task |
-| `Notify` | `await n.NotifiedAsync()`, `n.NotifyOne()` weckt einen Wartenden |
-| `Watch<T>` | Der neueste Wert: `Set`, `Get`, `await w.ChangedAsync()` |
-| `Broadcast<T>` | Jeder `Subscribe()`-Empfänger bekommt jeden Wert, `T` muss Clone sein |
+| `Task.Run` | Gives a `JoinHandle<T>`. Dropping it detaches the task; `Abort()` cancels it. |
+| `Task.RunBlocking` | Blocking code on a thread of its own |
+| `Task.WhenAny`, `Task.Race` | The first one wins, the others are cancelled |
+| `Task.Timeout(task, ms)` | Cancels and gives `Err(Elapsed)` |
+| `Interval` | A steady tick: `await tick.TickAsync()` |
+| `AsyncMutex<T>` | The guard may be held across `await`; clones share the data |
+| `Semaphore` | `await s.AcquireAsync()`; dropping the permit returns it |
+| `Channel.CreateBounded<T>(n)` | `await tx.SendAsync(v)` waits while the channel is full |
+| `rx.ReceiveAsync()` | Gives `Option<T>`, `None` once all senders are gone: `while (await rx.ReceiveAsync() is Some(var v))` |
+| `TaskCompletionSource<T>` | A task completed by hand |
+| `Notify` | `await n.NotifiedAsync()`; `n.NotifyOne()` wakes one waiter |
+| `Watch<T>` | The latest value: `Set`, `Get`, `await w.ChangedAsync()` |
+| `Broadcast<T>` | Every `Subscribe()` receiver gets every value; `T` must be Clone |
 | `CancellationTokenSource` | `Cancel()`, `IsCancellationRequested`, `await CancelledAsync()` |
-| `Signal.WaitAsync(n)` | Wartet auf ein Betriebssystem-Signal |
+| `Signal.WaitAsync(n)` | Waits for an operating-system signal |
 
-`async IAsyncEnumerable<T>` mit `yield return`, `await foreach` und `await using` funktionieren wie in C#.
-`async ValueTask` und `async ValueTask<T>` ebenso. Wird ein `await foreach` verlassen, gibt das den
-Iterator frei.
+`async IAsyncEnumerable<T>` with `yield return`, `await foreach` and `await using` work as in C#, and so
+do `async ValueTask` and `async ValueTask<T>`. Leaving an `await foreach` drops the iterator.
 
-### Netzwerk
+### Networking
 
 ```csharp
 var listener = TcpListener.Bind("127.0.0.1", 8080).Unwrap();
@@ -500,26 +493,27 @@ static async Task<Result<int, IoError>> Handle(TcpStream s)
 }
 ```
 
-`ReadAsync` und `WriteAsync` borgen den Puffer, bis der Task fertig ist. Daneben gibt es
-`TcpStream.ConnectAsync`, `ReadLineAsync`, `WriteAsync(string)` und `ShutdownWrite`. Jede Operation
-liefert `Result<_, IoError>`, eine abgelehnte Verbindung ist also ein `Err`-Wert. `TcpListener` und `TcpStream` können IPv6 (`"::1"`), Hostnamen löst
-`ConnectAsync` über `Dns.ResolveAsync` auf. Für Unix-Sockets gibt es `UnixListener` und `UnixStream`, für
-Datagramme `UdpSocket` mit `SendToAsync` und `ReceiveFromAsync`. `File.ReadAllTextAsync` und `WriteAllTextAsync` laufen auf eigenen Threads.
+`ReadAsync` and `WriteAsync` borrow the buffer until the task is done. There are also
+`TcpStream.ConnectAsync`, `ReadLineAsync`, `WriteAsync(string)` and `ShutdownWrite`. Every operation
+returns `Result<_, IoError>`, so a refused connection is an `Err` value. `TcpListener` and `TcpStream`
+support IPv6 (`"::1"`), and `ConnectAsync` resolves host names through `Dns.ResolveAsync`. For Unix
+sockets there are `UnixListener` and `UnixStream`, and for datagrams `UdpSocket` with `SendToAsync` and
+`ReceiveFromAsync`. `File.ReadAllTextAsync` and `WriteAllTextAsync` run on threads of their own.
 
-## typeof und GetType
+## typeof and GetType
 
-`typeof(T)` und `x.GetType()` liefern einen `Type` mit `Name` und `FullName`, mehr nicht. Generische
-Parameter sind aufgelöst, `typeof(T)` in `NameOf<string>()` ist also `String`. `==` verbraucht beide
-Operanden, `a.Same(in b)` nicht. Auf einem Typparameter liefert `GetType` den statischen Typ.
+`typeof(T)` and `x.GetType()` give a `Type` with `Name` and `FullName`, nothing more. Generic parameters
+are resolved, so `typeof(T)` in `NameOf<string>()` is `String`. `==` consumes both operands;
+`a.Same(in b)` does not. On a type parameter, `GetType` gives the static type.
 
-## Fehler: Result, `?` und Panics
+## Errors: Result, `?` and panics
 
-Es gibt keine Exceptions. `throw`, `try`, `catch` und `finally` sind im Benutzercode Fehler (`CS9930`).
-Wie in Rust gibt es zwei Arten von Fehlern:
+There are no exceptions. `throw`, `try`, `catch` and `finally` are errors in user code (`CS9930`). As in
+Rust, there are two kinds of errors:
 
-**Erwartbare Fehler sind Werte.** Eine Methode, die scheitern kann, gibt `Result<T, E>` oder
-`Option<T>` zurück. `x?` reicht den Fehler weiter: Bei `Err` (oder `None`) kehrt die Methode sofort
-zurück und gibt ihre lokalen Werte frei, sonst ist `x?` der Wert darin.
+**Expected failures are values.** A method that can fail returns `Result<T, E>` or `Option<T>`. `x?`
+passes the error on: on `Err` (or `None`) the method returns immediately and drops its locals; otherwise
+`x?` is the value inside.
 
 ```csharp
 static Result<int, ParseError> Sum(List<string> items)
@@ -537,59 +531,58 @@ static async Task<Result<string, IoError>> FirstLine(string host)
 }
 ```
 
-- `f()?;` steht auch allein als Anweisung, `x?.Name` ruft nach dem Weiterreichen ein Member auf.
-- Hat die Methode einen anderen Fehlertyp, wandelt `?` den Fehler über einen `implicit operator` um.
-  Das ist Rusts `From`.
-- `?` braucht eine Methode, die `Result` oder `Option` zurückgibt (`CS9932`), und einen Operanden dieses
-  Typs (`CS9931`).
-- Ein `?` gefolgt von `:` bleibt der Bedingungsoperator. `?.` auf anderen Typen ist ein Fehler (`CS9937`),
-  denn eine Referenz ist nie `null`.
+- `f()?;` also works as a statement on its own, and `x?.Name` calls a member after passing the error on.
+- If the method has a different error type, `?` converts the error through an `implicit operator`. That
+  is Rust's `From`.
+- `?` needs a method that returns `Result` or `Option` (`CS9932`) and an operand of that type (`CS9931`).
+- A `?` followed by `:` stays the conditional operator. `?.` on other types is an error (`CS9937`),
+  because a reference is never `null`.
 
-`Option<T>` hat die Methoden von Rusts `Option`: `IsSome`, `IsNone`, `IsSomeAnd`, `IsNoneOr`, `AsRef`,
+`Option<T>` has the methods of Rust's `Option`: `IsSome`, `IsNone`, `IsSomeAnd`, `IsNoneOr`, `AsRef`,
 `AsMut`, `AsDeref`, `AsDerefMut`, `Unwrap`, `Expect`, `UnwrapOr`, `UnwrapOrElse`, `UnwrapOrDefault`, `Map`,
-`MapOr`, `MapOrElse`, `Inspect`, `OkOr`, `OkOrElse`, `Filter`, `And`, `AndThen`, `Or`, `OrElse`, `Xor`, `Zip`,
-`Unzip`, `Take`, `TakeIf`, `Replace`, `Insert`, `GetOrInsert`, `GetOrInsertWith`, `Iter`, `IterMut`,
-`Cloned`, `Copied`, `Transpose` und `Flatten`. `UnwrapOrDefault` verlangt wie in Rust `T : IDefault<T>`;
-die eingebauten Zahlen, `bool`, `char` und `string` (`""`) erfüllen das.
+`MapOr`, `MapOrElse`, `Inspect`, `OkOr`, `OkOrElse`, `Filter`, `And`, `AndThen`, `Or`, `OrElse`, `Xor`,
+`Zip`, `Unzip`, `Take`, `TakeIf`, `Replace`, `Insert`, `GetOrInsert`, `GetOrInsertWith`, `Iter`,
+`IterMut`, `Cloned`, `Copied`, `Transpose` and `Flatten`. As in Rust, `UnwrapOrDefault` needs
+`T : IDefault<T>`; the built-in numbers, `bool`, `char` and `string` (`""`) satisfy it.
 
-`Result<T, E>` hat die Methoden von Rusts `Result`, in C#-Schreibweise:
+`Result<T, E>` has the methods of Rust's `Result`, in C# spelling:
 
-| Zweck | Methoden |
+| Purpose | Methods |
 |---|---|
-| Auslesen | `Unwrap`, `UnwrapErr`, `Expect(msg)`, `ExpectErr(msg)`, `Ok()`, `Err()`, `IntoOk`, `IntoErr` |
-| Prüfen | `IsOk`, `IsErr`, `IsOkAnd(f)`, `IsErrAnd(f)`; die beiden letzten verbrauchen das `Result` wie in Rust |
-| Umwandeln | `Map`, `MapErr`, `MapOr(standard, f)`, `MapOrElse(fehlerFn, f)`, `Inspect(f)`, `InspectErr(f)` |
-| Verketten | `And(r)`, `AndThen(f)`, `Or(r)`, `OrElse(f)` |
-| Standardwerte | `UnwrapOr(x)`, `UnwrapOrElse(f)`, `UnwrapOrDefault()` |
-| Referenzen | `AsRef()`, `AsMut()`, `AsDeref()` (für `Rc`, `Arc`, `Box`), `AsDerefMut()` (für `Box`) |
-| Kopien | `Cloned()` und `Copied()` auf einem `Result<Ref<T>, E>` oder `Result<RefMut<T>, E>` |
-| Verschachtelt | `Transpose()` auf `Result<Option<T>, E>`, `Flatten()` auf `Result<Result<T, E>, E>` |
-| Iteration | `Iter()` für `foreach` und LINQ, `IterMut()` für `foreach (ref var v in ...)` |
+| Reading | `Unwrap`, `UnwrapErr`, `Expect(msg)`, `ExpectErr(msg)`, `Ok()`, `Err()`, `IntoOk`, `IntoErr` |
+| Checking | `IsOk`, `IsErr`, `IsOkAnd(f)`, `IsErrAnd(f)`; the last two consume the `Result`, as in Rust |
+| Transforming | `Map`, `MapErr`, `MapOr(fallback, f)`, `MapOrElse(errorFn, f)`, `Inspect(f)`, `InspectErr(f)` |
+| Chaining | `And(r)`, `AndThen(f)`, `Or(r)`, `OrElse(f)` |
+| Fallbacks | `UnwrapOr(x)`, `UnwrapOrElse(f)`, `UnwrapOrDefault()` |
+| References | `AsRef()`, `AsMut()`, `AsDeref()` (for `Rc`, `Arc`, `Box`), `AsDerefMut()` (for `Box`) |
+| Copies | `Cloned()` and `Copied()` on a `Result<Ref<T>, E>` or `Result<RefMut<T>, E>` |
+| Nesting | `Transpose()` on `Result<Option<T>, E>`, `Flatten()` on `Result<Result<T, E>, E>` |
+| Iteration | `Iter()` for `foreach` and LINQ, `IterMut()` for `foreach (ref var v in ...)` |
 
-### Referenzen als Werte: `Ref<T>` und `RefMut<T>`
+### References as values: `Ref<T>` and `RefMut<T>`
 
-`Ref<T>` ist Rusts `&T`, `RefMut<T>` ist `&mut T`. Anders als `in` und `ref` sind sie Werte und können
-Typargumente sein, deshalb gibt es `Result<Ref<T>, Ref<E>>` wie in Rust:
+`Ref<T>` is Rust's `&T`, and `RefMut<T>` is `&mut T`. Unlike `in` and `ref`, they are values and can be
+type arguments, so `Result<Ref<T>, Ref<E>>` exists as in Rust:
 
 ```csharp
 mut var r = int.Parse("41");
 var view = r.AsRef();              // Result<Ref<int>, Ref<ParseError>>
 Console.WriteLine(view.Unwrap().Value);
-r.AsMut().Unwrap().Value += 1;     // ändert r selbst
-bool big = r.AsRef().IsOkAnd(v => v.Value > 40);   // r bleibt erhalten
+r.AsMut().Unwrap().Value += 1;     // changes r itself
+bool big = r.AsRef().IsOkAnd(v => v.Value > 40);   // r is kept
 var copy = r.AsRef().Copied();     // Result<int, ParseError>
 ```
 
-Der Borrow-Checker behandelt sie wie Rusts Referenzen: Solange `view` benutzt wird, ist `r` geborgt,
-eine Zuweisung an `r` ist dann `CS9907`. Zwei `AsMut` gleichzeitig sind `CS9911`, und eine Referenz,
-die eine Methode verlassen soll, aber in einen lokalen Wert zeigt, ist `CS9912`. `Ref<T>` ist Copy,
-`RefMut<T>` wird verschoben. `Ref<T>.Of(in x)` und `RefMut<T>.Of(ref x)` entsprechen `&x` und `&mut x`.
+The borrow checker treats them like Rust's references: as long as `view` is used, `r` is borrowed, and
+assigning to `r` is then `CS9907`. Two `AsMut` at the same time are `CS9911`, and a reference that is
+meant to leave a method but points into a local is `CS9912`. `Ref<T>` is Copy; `RefMut<T>` is moved.
+`Ref<T>.Of(in x)` and `RefMut<T>.Of(ref x)` correspond to `&x` and `&mut x`.
 
-Referenzen dürfen auch in Sammlungen stehen, wie Rusts `Vec<&T>`: `List`, `Dictionary`, `HashSet`,
-`Queue`, `Stack` und `SortedDictionary`. Was eine Sammlung speichert, muss sie überleben
-(`list.Add(Ref<int>.Of(in x))` verlangt, dass `x` länger lebt als `list`), und was herauskommt (`Pop`,
-`list[i]`, `foreach`), ist nur so lange gültig wie die Sammlung. Eine Sammlung voller Referenzen kann
-eine Methode verlassen, wenn ihre Referenzen in die Argumente zeigen:
+References may also be stored in collections, like Rust's `Vec<&T>`: `List`, `Dictionary`, `HashSet`,
+`Queue`, `Stack` and `SortedDictionary`. What a collection stores must outlive it
+(`list.Add(Ref<int>.Of(in x))` requires `x` to live longer than `list`), and what comes out of it
+(`Pop`, `list[i]`, `foreach`) is only valid as long as the collection. A collection full of references
+can leave a method if its references point into the arguments:
 
 ```csharp
 static List<Ref<Person>> Adults(in List<Person> people)
@@ -601,43 +594,42 @@ static List<Ref<Person>> Adults(in List<Person> people)
 }
 ```
 
-Strenger als Rust: Ein Wert, der aus einer Sammlung herauskopiert wird, darf die Sammlung selbst nicht
-überleben, auch wenn das, worauf er zeigt, noch lebt. Eine Sammlung von Referenzen in einem Feld eines
-Objekts ist ein Fehler (`CS9914`), weil Klassen keine Lifetime-Parameter haben.
+Stricter than Rust: a value copied out of a collection must not outlive the collection itself, even if
+what it points to is still alive. A collection of references in a field of an object is an error
+(`CS9914`), because classes have no lifetime parameters.
 
-`Box<T>` ist Rusts `Box`: ein Wert auf dem Heap mit einem Besitzer. `Value` gibt geteilten Zugriff,
-`ValueMut` exklusiven, `Unbox()` holt den Wert heraus. `[Copy]` an einem Typparameter verlangt wie
-`T: Copy` einen Copy-Typ (`CS9922`).
+`Box<T>` is Rust's `Box`: a value on the heap with one owner. `Value` gives shared access, `ValueMut`
+exclusive access, and `Unbox()` takes the value out. `[Copy]` on a type parameter requires a Copy type,
+like `T: Copy` (`CS9922`).
 
-Die Corelib wirft nichts. Was in Rust fehlschlagen darf, liefert dort ein `Option` oder `Result`:
+The core library throws nothing. What may fail in Rust returns an `Option` or `Result` here:
 
-| Aufruf | Ergebnis |
+| Call | Result |
 |---|---|
 | `int.Parse`, `long.Parse`, `decimal.Parse` | `Result<_, ParseError>` |
-| `list.RemoveLast()`, `stack.Pop()`, `queue.Dequeue()` | `Option<T>`, `None` wenn leer |
-| `First()`, `Last()`, `Single()`, `Max()`, `Min()`, `Average()` | `Option<T>`, `None` ohne Elemente |
-| `dict.Add(key, value)` | `Option<V>`: ersetzt den alten Wert und gibt ihn zurück, wie `HashMap::insert` |
+| `list.RemoveLast()`, `stack.Pop()`, `queue.Dequeue()` | `Option<T>`, `None` when empty |
+| `First()`, `Last()`, `Single()`, `Max()`, `Min()`, `Average()` | `Option<T>`, `None` without elements |
+| `dict.Add(key, value)` | `Option<V>`: replaces the old value and returns it, like `HashMap::insert` |
 | `receiver.Receive()` | `Result<T, RecvError>` |
 
-Rusts Namen gibt es zusätzlich: `List` hat `Push`, `Pop`, `Len`, `IsEmpty`, `Get`/`GetMut` (Option einer
-Referenz), `Remove`, `SwapRemove`, `Swap`, `Truncate`, `Retain`, `Dedup`, `Extend`, `Iter`; `Dictionary` hat
-`Insert`, `Get`/`GetMut`, `Len`, `OrInsert` (`entry().or_insert()`), `OrInsertWith`, `Keys`, `Values`;
-Iteratoren haben `Map`, `Filter`, `Fold`, `Find`, `Position`, `Nth`, `Enumerate`, `StepBy`, `Chain`, `Rev`,
-`Collect`. `string.Join(sep, list)` verbindet.
+Rust's names exist as well: `List` has `Push`, `Pop`, `Len`, `IsEmpty`, `Get`/`GetMut` (an Option of a
+reference), `Remove`, `SwapRemove`, `Swap`, `Truncate`, `Retain`, `Dedup`, `Extend` and `Iter`;
+`Dictionary` has `Insert`, `Get`/`GetMut`, `Len`, `OrInsert` (`entry().or_insert()`), `OrInsertWith`,
+`Keys` and `Values`; iterators have `Map`, `Filter`, `Fold`, `Find`, `Position`, `Nth`, `Enumerate`,
+`StepBy`, `Chain`, `Rev` and `Collect`. `string.Join(sep, list)` joins.
 
-Wie in Rust paniken dagegen Indexer und Methoden, die eine Referenz liefern (`list[i]`, `dict[key]`,
-`Peek()`), außerdem `RefCell.BorrowMut` bei bestehendem Borrow (vorher fragt man `CanBorrowMut`).
+As in Rust, on the other hand, indexers and methods that return a reference panic (`list[i]`,
+`dict[key]`, `Peek()`), and so does `RefCell.BorrowMut` while a borrow exists (ask `CanBorrowMut`
+first).
 
- Netzwerk und
-Dateien geben `Result<_, IoError>` zurück. Für `decimal` gibt es `CheckedAdd`, `CheckedSub`,
-`CheckedMul`, `CheckedDiv`, `CheckedRem` und `CheckedToInt64`, die `Option` liefern. `Unit` ist Rusts
-`()`, zum Beispiel in `Result<Unit, IoError>`.
+Networking and files return `Result<_, IoError>`. For `decimal` there are `CheckedAdd`, `CheckedSub`,
+`CheckedMul`, `CheckedDiv`, `CheckedRem` and `CheckedToInt64`, which return `Option`. `Unit` is Rust's
+`()`, for example in `Result<Unit, IoError>`.
 
-**Fehler im Programm sind Panics.** `Panic.Raise("...")`, `Panic.Unreachable()`, `Panic.Todo()` und
-`Panic.Assert(bedingung)` entsprechen `panic!`, `unreachable!`, `todo!` und `assert!`. Auch
-Null-Zugriffe, Indexfehler, Division durch null, ungültige Casts, `checked`-Überläufe und
-`Unwrap()` auf `Err` oder `None` sind Panics. Die Meldung erscheint wie in Rust, mit Datei, Zeile und
-Spalte im Benutzercode:
+**Bugs in the program are panics.** `Panic.Raise("...")`, `Panic.Unreachable()`, `Panic.Todo()` and
+`Panic.Assert(condition)` correspond to `panic!`, `unreachable!`, `todo!` and `assert!`. Index errors,
+division by zero, invalid casts, `checked` overflows, and `Unwrap()` on `Err` or `None` are panics too.
+The message appears as in Rust, with the file, line and column in user code:
 
 ```
 thread 'main' panicked at src/main.rscs:7:38:
@@ -645,13 +637,13 @@ index out of bounds
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 ```
 
-Danach wickelt der Panic den Thread ab und gibt dabei alle Werte frei. Im Hauptthread endet das
-Programm mit Exit-Code 101. In einem anderen Thread oder Task lässt sich ein Panic nicht abfangen,
-aber beobachten: `thread.Join()` und `await handle` liefern dann `Err(JoinError)` mit `IsPanic` und
-`Message`. Ein abgebrochener Task liefert `Err` mit `IsCancelled`.
+The panic then unwinds the thread and drops every value on the way. In the main thread, the program
+ends with exit code 101. In another thread or task, a panic cannot be caught, but it can be observed:
+`thread.Join()` and `await handle` then give `Err(JoinError)` with `IsPanic` and `Message`. A cancelled
+task gives `Err` with `IsCancelled`.
 
-**`Main` darf ein `Result` zurückgeben**, auch als `async Task<Result<T, E>>`. `Ok` beendet das
-Programm mit Exit-Code 0, `Err` gibt `Error: ` und den Fehler auf stderr aus und endet mit 1:
+**`Main` may return a `Result`**, also as `async Task<Result<T, E>>`. `Ok` ends the program with exit
+code 0; `Err` prints `Error: ` and the error to stderr and ends with 1:
 
 ```csharp
 static Result<Unit, ParseError> Main()
@@ -662,71 +654,72 @@ static Result<Unit, ParseError> Main()
 }
 ```
 
-Wird ein Iterator oder Task vorzeitig freigegeben, laufen seine Destruktoren. Aufräumarbeit gehört
-in einen Destruktor oder ein `using`, beide laufen auch beim Abwickeln eines Panics.
+If an iterator or task is dropped early, its destructors run. Cleanup belongs in a destructor or a
+`using`; both also run while a panic unwinds.
 
 ## unsafe
 
-In `unsafe`-Code sind Rohzeiger erlaubt, und Borrows durch sie werden nicht geprüft. `unsafe` ist
-außerdem nötig für:
+In `unsafe` code, raw pointers are allowed, and borrows through them are not checked. `unsafe` is also
+required for:
 
-- Zugriffe auf veränderliche `static`-Felder (CS9921), weil jeder Thread das Feld ändern kann
+- accessing mutable `static` fields (CS9921), because any thread can change the field
 - `Mem.Transmute` (CS9921)
 
-Die wichtigsten Bausteine aus `Mem`:
+The most important building blocks in `Mem`:
 
-| Methode | Bedeutung |
+| Method | Meaning |
 |---|---|
-| `Take(ref x)` | verschiebt den Wert heraus, lässt `default` zurück |
-| `Replace(ref x, v)` | tauscht den Wert und gibt den alten zurück |
-| `Swap(ref a, ref b)` | vertauscht zwei Werte |
-| `Drop(x)` | gibt sofort frei |
-| `Forget(x)` | übernimmt den Wert, ohne ihn freizugeben |
-| `Read(p)`, `Write(p, v)` | bitweises Lesen und Schreiben über Zeiger |
-| `DropInPlace(p)` | gibt den Wert hinter einem Zeiger frei |
+| `Take(ref x)` | moves the value out and leaves `T.Default()` behind (needs `T : IDefault<T>`) |
+| `Replace(ref x, v)` | swaps in a new value and returns the old one |
+| `Swap(ref a, ref b)` | swaps two values |
+| `Drop(x)` | drops the value now |
+| `Forget(x)` | takes the value without ever dropping it |
+| `Read(p)`, `Write(p, v)` | bitwise reads and writes through a pointer |
+| `DropInPlace(p)` | drops the value behind a pointer |
 
-## Fehlercodes
+## Error codes
 
-| Code | Bedeutung |
+| Code | Meaning |
 |---|---|
-| CS9900 | Verwendung eines verschobenen Werts |
-| CS9901 | Borrow eines verschobenen Werts |
-| CS9902 | Move aus einem Borrow |
-| CS9903 | Move aus einem Array-Element |
-| CS9904 | Move aus einem `static`-Feld |
-| CS9905 | Move aus einem Typ mit Destruktor |
-| CS9906 | Move eines geborgten Werts |
-| CS9907 | Zuweisung an einen geborgten Wert |
-| CS9908 | Verwendung während eines exklusiven Borrows |
-| CS9909 | exklusiver Borrow trotz bestehendem Shared-Borrow |
-| CS9910 | Shared-Borrow trotz bestehendem exklusivem Borrow |
-| CS9911 | zwei exklusive Borrows zugleich |
-| CS9912 | Wert lebt nicht lange genug |
-| CS9913 | temporärer Wert wird freigegeben, während er geborgt ist |
-| CS9914 | Referenz auf eine lokale Variable wird zurückgegeben |
-| CS9915 | Lifetime reicht nicht aus |
-| CS9916 | Lifetime-Angabe fehlt |
-| CS9917 | Zuweisung hinter einer Shared-Referenz |
-| CS9918 | exklusiver Borrow hinter einer Shared-Referenz |
-| CS9919 | Feature wird nicht unterstützt |
-| CS9920 | Empfänger passt nicht zur Deklaration |
-| CS9921 | `unsafe` erforderlich |
-| CS9922 | Typ implementiert kein Clone |
-| CS9923 | Typ ist nicht `Send` |
-| CS9924 | Typ ist nicht `Sync` |
-| CS9925 | Closure könnte länger leben als das, was sie borgt |
-| CS9926 | Wert darf nicht über ein `await` gehalten werden |
-| CS9927 | Delegate ohne `[Mut]` ändert seine Captures |
-| CS9933 | `dynamic`: Interfaces statt `dyn Trait`, `object` mit `is` statt `dyn Any` |
-| CS9934 | Basisklasse angegeben: es gibt keine Vererbung |
-| CS9930 | `throw`, `try`, `catch` oder `finally` |
-| CS9931 | `?` auf etwas, das weder `Result` noch `Option` ist |
-| CS9932 | `?` in einer Methode, die kein passendes `Result` oder `Option` zurückgibt |
-| CS9928 | zweite Zuweisung an eine Variable ohne `mut` |
-| CS9929 | Änderung oder exklusiver Borrow einer Variable ohne `mut` |
-| CS8509 | `switch`-Ausdruck deckt nicht alle Fälle ab |
-| CS9935 | `null`: ein fehlender Wert ist `Option<T>.None` |
-| CS9936 | `#nullable`: Referenzen sind nie `null` |
-| CS9937 | `x!`, `??`, `??=`, `?.` auf einer Referenz, `as` |
-| CS9938 | Ein Ausdruck würde `null` enthalten: `default`, `new T[n]`, `new S()` |
-| CS8618 | Feld ohne Wert nach dem Konstruktor |
+| CS0311 | `Mem.Take` or `UnwrapOrDefault` on a type without `IDefault<T>` |
+| CS8509 | a `switch` expression does not cover every case |
+| CS8618 | a field has no value after the constructor |
+| CS9900 | use of a moved value |
+| CS9901 | borrow of a moved value |
+| CS9902 | move out of a borrow |
+| CS9903 | move out of an array element |
+| CS9904 | move out of a `static` field |
+| CS9905 | move out of a type with a destructor |
+| CS9906 | move of a borrowed value |
+| CS9907 | assignment to a borrowed value |
+| CS9908 | use during an exclusive borrow |
+| CS9909 | exclusive borrow while a shared borrow exists |
+| CS9910 | shared borrow while an exclusive borrow exists |
+| CS9911 | two exclusive borrows at the same time |
+| CS9912 | a value does not live long enough |
+| CS9913 | a temporary is dropped while it is borrowed |
+| CS9914 | returning a reference to a local variable |
+| CS9915 | a lifetime is too short |
+| CS9916 | a lifetime annotation is missing |
+| CS9917 | assignment behind a shared reference |
+| CS9918 | exclusive borrow behind a shared reference |
+| CS9919 | feature not supported |
+| CS9920 | the receiver does not match the declaration |
+| CS9921 | `unsafe` required |
+| CS9922 | the type does not implement Clone |
+| CS9923 | the type is not `Send` |
+| CS9924 | the type is not `Sync` |
+| CS9925 | a closure may outlive what it borrows |
+| CS9926 | a value must not be held across an `await` |
+| CS9927 | a delegate without `[Mut]` changes its captures |
+| CS9928 | a second assignment to a variable without `mut` |
+| CS9929 | a change to, or exclusive borrow of, a variable without `mut` |
+| CS9930 | `throw`, `try`, `catch` or `finally` |
+| CS9931 | `?` on something that is neither a `Result` nor an `Option` |
+| CS9932 | `?` in a method that does not return a matching `Result` or `Option` |
+| CS9933 | `dynamic`: use interfaces instead of `dyn Trait`, `object` with `is` instead of `dyn Any` |
+| CS9934 | a base class was given: there is no inheritance |
+| CS9935 | `null`: a missing value is `Option<T>.None` |
+| CS9936 | `#nullable`: references are never `null` |
+| CS9937 | `x!`, `??`, `??=`, `?.` on a reference, `as` |
+| CS9938 | an expression would hold `null`: `default`, `new T[n]`, `new S()` |
