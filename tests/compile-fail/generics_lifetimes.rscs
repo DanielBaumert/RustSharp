@@ -1,0 +1,55 @@
+// Generic code is checked as in Rust. A body may not store a T where no lifetime is tracked unless
+// `where T : 'static`; a caller's references stay bound through every generic path; and a trait bound
+// `T : IStore<U>` makes U outlive T, as Rust's impl would.
+using System;
+using System.Collections.Generic;
+using System.Threading;
+
+class Stack<T>
+{
+    List<T> _items = new List<T>();
+    public void Push(T x) { _items.Add(x); }
+    public Option<T> Pop() => _items.Pop();
+    public readonly int Count => _items.Count;
+}
+
+interface IStore<U> { void Store(U x); }
+class Acc<V> : IStore<V> { public List<V> Items = new List<V>(); public void Store(V x) { Items.Add(x); } }
+class Static<T> { public static Option<T> Slot = None; }
+class Leak<T> { public static Option<T> Slot = None; public void Put(T x) { unsafe { Slot = Some(x); } } } // error: CS9915
+class HP<'a, 'b> { public Ref<'a, int> X; public Ref<'b, int> Y; public HP(Ref<'a, int> x, Ref<'b, int> y) { X = x; Y = y; } }
+class Wrapper<T, U> where T : IStore<U> { T _inner; public Wrapper(T i) { _inner = i; } public void Put(U u) { _inner.Store(u); } public readonly int Count() => 0; }
+
+class P
+{
+    // Bodies.
+    static void KeepUnbounded<T>(T x) { unsafe { Static<T>.Slot = Some(x); } } // error: CS9915
+    static void SendUnbounded<T>(T x) { var t = Thread.Run(move () => { var y = x; return 0; }); } // error: CS9915
+    static void StoreConcrete<T>(ref T a, Ref<int> r) where T : IStore<Ref<int>> { a.Store(r); } // error: CS9915
+
+    static T Id<T>(T x) => x;
+    static Option<T> Wrap<T>(T x) => Some(x);
+    static void Out<T>(T x, out Option<T> o) { o = Some(x); }
+    static void Put<T>(ref Option<T> slot, T x) { slot = Some(x); }
+    static Stack<T> One<T>(T x) { mut var s = new Stack<T>(); s.Push(x); return s; }
+    static void Fill<T, U>(ref T a, U b) where T : IStore<U> { a.Store(b); }
+    static void Keep<T>(T x) where T : 'static { unsafe { Static<T>.Slot = Some(x); } }
+    static Ref<'a, int> FirstOf<'a, 'b>(in HP<'a, 'b> p) => p.X;
+
+    // Callers.
+    static void StaticBound() { int a = 1; Keep(Ref<int>.Of(in a)); } // error: CS9914
+    static void ChangedWhileHeld() { mut int a = 1; mut var s = new Stack<Ref<int>>(); s.Push(Ref<int>.Of(in a)); a = 2; Console.WriteLine(s.Count); } // error: CS9907
+    static void StackOutlives() { mut var s = new Stack<Ref<int>>(); { int a = 1; s.Push(Ref<int>.Of(in a)); } Console.WriteLine(s.Count); } // error: CS9912
+    static void IdOutlives() { mut Option<Ref<int>> k = None; { int a = 1; k = Some(Id(Ref<int>.Of(in a))); } Console.WriteLine(k.IsSome); } // error: CS9912
+    static void PopOutlives() { mut Option<Ref<int>> k = None; { int a = 1; mut var s = new Stack<Ref<int>>(); s.Push(Ref<int>.Of(in a)); k = s.Pop(); } Console.WriteLine(k.IsSome); } // error: CS9912
+    static void WrapOutlives() { mut Option<Ref<int>> k = None; { int a = 1; k = Wrap(Ref<int>.Of(in a)); } Console.WriteLine(k.IsSome); } // error: CS9912
+    static void OutOutlives() { mut Option<Ref<int>> k = None; { int a = 1; Out(Ref<int>.Of(in a), out k); } Console.WriteLine(k.IsSome); } // error: CS9912
+    static void RefOutlives() { mut Option<Ref<int>> k = None; { int a = 1; Put(ref k, Ref<int>.Of(in a)); } Console.WriteLine(k.IsSome); } // error: CS9912
+    static void ContainerOutlives() { mut var keep = new Stack<Ref<int>>(); { int a = 1; keep = One(Ref<int>.Of(in a)); } Console.WriteLine(keep.Count); } // error: CS9912
+    static void BoundOutlives() { mut var acc = new Acc<Ref<int>>(); { int x = 1; Fill(ref acc, Ref<int>.Of(in x)); } Console.WriteLine(acc.Items.Count); } // error: CS9912
+    static void TypeBoundOutlives() { mut var w = new Wrapper<Acc<Ref<int>>, Ref<int>>(new Acc<Ref<int>>()); { int a = 1; w.Put(Ref<int>.Of(in a)); } Console.WriteLine(w.Count()); } // error: CS9912
+    static void SlotsThroughT() { mut int a = 1; int b = 2; var h = Id(new HP(Ref<int>.Of(in a), Ref<int>.Of(in b))); var r = FirstOf(in h); a = 5; Console.WriteLine(r.Value); } // error: CS9907
+    static void ToThread() { int a = 1; mut var s = new Stack<Ref<int>>(); s.Push(Ref<int>.Of(in a)); var t = Thread.Run(move () => s.Count); } // error: CS9914
+
+    static void Main() { }
+}

@@ -172,7 +172,9 @@ general performance claims.
 - There is no `null`, neither in user code nor in the core library; use `Option<T>` for optional values.
   Only raw pointers in `unsafe` code may be null, as with Rust's `ptr::null`.
 - Lifetime parameters exist for ref structs, classes, structs, delegates, `Ref<'a, T>`/`RefMut<'a, T>` and
-  `str<'a>`. A variable that a lambda captures cannot hold borrows unless they are `'static`.
+  `str<'a>`, and generic code is checked with a lifetime per type parameter, as in Rust. A value with
+  several lifetimes passed as one `T` is treated as having the shortest. A variable that a lambda
+  captures cannot hold borrows unless they are `'static`.
 - Tasks are lazy, like Rust futures, rather than automatically starting like
   ordinary C# tasks.
 - The runtime uses a single reactor thread; file I/O runs on dedicated threads.

@@ -257,7 +257,34 @@ a = 5;                       // CS9907 while idx is used
   Rust's drop check: an object declared before what it borrows is `CS9912`.
 - A field without a lifetime can only hold `'static` borrows, as before.
 
-Not yet: variance beyond what the rules above imply, and `where T : 'a`.
+### Generics and lifetimes
+
+Generic code is checked as in Rust: a type parameter `T` stands for any type, references included, and
+carries a lifetime of its own. A generic container may therefore hold references, and a generic method
+may take and return them:
+
+```csharp
+class Stack<T> { List<T> _items = new(); public void Push(T x) { _items.Add(x); } }
+
+mut var s = new Stack<Ref<int>>();     // Rust: Vec<&i32>
+s.Push(Ref<int>.Of(in a));
+a = 2;                                 // CS9907 while s is used
+
+static T Id<T>(T x) => x;              // the result lives as long as x
+```
+
+- A body may not store a `T` where no lifetime is tracked, such as a static, a thread or an object
+  without lifetimes, unless the method says `where T : 'static` (`CS9915`). Its callers then have to
+  pass `'static` values. `where T : 'a` relates `T` to a named lifetime.
+- A trait bound `where T : IStore<U>` lets `T` hold `U`, so `U` must outlive `T` at every call, as
+  Rust's implementation would require.
+- Each type parameter has one lifetime. A value with several lifetimes, such as `HP<'a, 'b>`, keeps
+  them apart in its own type, but passed as a `T` they act as one, the shorter. That is stricter than
+  Rust, never unsound.
+- The core library's generic types keep their own rules (`[CarriesBorrows]`), with the same effect for
+  `List<T>`, `Option<T>` and the others.
+
+Not yet: variance beyond what the rules above imply.
 
 ### Ref structs
 

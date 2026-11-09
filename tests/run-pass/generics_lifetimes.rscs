@@ -1,0 +1,50 @@
+// Generic code is checked as in Rust: every type parameter carries a lifetime of its own, so a generic
+// container may hold references, and a generic function may take and return them.
+using System;
+using System.Collections.Generic;
+
+class Stack<T>
+{
+    List<T> _items = new List<T>();
+    public void Push(T x) { _items.Add(x); }
+    public Option<T> Pop() => _items.Pop();
+    public readonly int Count => _items.Count;
+}
+
+class Outer<T> { Stack<T> _inner = new Stack<T>(); public void Add(T x) { _inner.Push(x); } public readonly int N() => _inner.Count; }
+interface IStore<U> { void Store(U x); }
+class Acc<V> : IStore<V> { public List<V> Items = new List<V>(); public void Store(V x) { Items.Add(x); } }
+class Static<T> { public static Option<T> Slot = None; }
+class G { public static readonly int V = 7; }
+
+class P
+{
+    static T Id<T>(T x) => x;
+    static void PushAll<T>(ref Stack<T> s, T a, T b) { s.Push(a); s.Push(b); }
+    static void Fill<T, U>(ref T a, U b) where T : IStore<U> { a.Store(b); }
+    static void Keep<T>(T x) where T : 'static { unsafe { Static<T>.Slot = Some(x); } }
+
+    static void Main()
+    {
+        int a = 1, b = 2;
+
+        mut var s = new Stack<Ref<int>>();               // Rust: Vec<&i32>
+        s.Push(Ref<int>.Of(in a));
+        PushAll(ref s, Ref<int>.Of(in a), Ref<int>.Of(in b));
+        Console.WriteLine(s.Count);
+        if (s.Pop() is Some(var top)) Console.WriteLine(top.Value);
+
+        Console.WriteLine(Id(Ref<int>.Of(in a)).Value + 10);
+
+        mut var acc = new Acc<Ref<int>>();
+        Fill(ref acc, Ref<int>.Of(in b));               // T : IStore<U>, U outlives T
+        Console.WriteLine(acc.Items.Count);
+
+        mut var o = new Outer<Ref<int>>();               // a generic field inside a generic class
+        o.Add(Ref<int>.Of(in a));
+        Console.WriteLine(o.N());
+
+        Keep(Ref<int>.Of(in G.V));                       // where T : 'static, given a 'static borrow
+        unsafe { Console.WriteLine(Static<Ref<int>>.Slot.IsSome); }
+    }
+}
