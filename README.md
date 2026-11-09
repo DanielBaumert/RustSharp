@@ -158,8 +158,10 @@ compiler that emits IL.
 
 The project includes compile-pass and compile-fail tests, runtime tests,
 AddressSanitizer/LeakSanitizer and ThreadSanitizer runs, decimal differential
-tests against .NET, and selected Roslyn test suites. The current project status
-and test counts are tracked in [STATUS.md](STATUS.md).
+tests against .NET, and selected Roslyn test suites. Probe suites in `tests/probes/`
+record the verdict Rust would give for each case of generics and variance; run them with
+`python3 tests/probes/run.py`. The current project status and test counts are tracked in
+[STATUS.md](STATUS.md).
 
 Benchmarks in this repository compare native RustSharp programs with equivalent C
 and Tokio programs. They are illustrative single-machine measurements, not

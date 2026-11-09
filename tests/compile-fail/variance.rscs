@@ -1,0 +1,67 @@
+// Variance as in Rust, derived per slot from the fields: &mut T (RefMut, a `ref 'a T` field) and UnsafeCell
+// are invariant in T, so a shorter-lived value cannot be stored where a longer-lived one is expected.
+using System;
+using System.Collections.Generic;
+
+ref struct MutView<'a, T> { public ref 'a T Target; public MutView(ref 'a T t) { Target = ref t; } }
+
+class MyCell<T>
+{
+    UnsafeCell<T> _v;
+    public MyCell(T x) { _v = new UnsafeCell<T>(x); }
+    public readonly unsafe void Set(T x) { *_v.Get() = x; }
+    public readonly unsafe ref readonly T Peek() => ref *_v.Get();
+}
+
+class P
+{
+    static void Assign<'a, 'b>(RefMut<'a, Ref<'b, List<int>>> m, Ref<'b, List<int>> s) { m.Value = s; }
+    static void AssignSame<'a>(RefMut<'a, Ref<'a, List<int>>> m, Ref<'a, List<int>> s) { m.Value = s; }
+    static void AssignView<'a, 'b>(mut MutView<'a, Ref<'b, List<int>>> v, Ref<'b, List<int>> s) { v.Target = s; }
+    static void Put<'a>(in MyCell<Ref<'a, List<int>>> c, Ref<'a, List<int>> r) { c.Set(r); }
+
+    static void RefMutInner()
+    {
+        var longLived = new List<int> { 1 };
+        mut Ref<List<int>> keep = Ref<List<int>>.Of(in longLived);
+        {
+            var shortLived = new List<int> { 1, 2, 3 };
+            Assign(RefMut<Ref<List<int>>>.Of(ref keep), Ref<List<int>>.Of(in shortLived)); // error: CS9912
+        }
+        Console.WriteLine(keep.Value.Count);
+    }
+
+    // One 'a for both keeps `keep` borrowed for all of 'a, as Rust's `&'a mut &'a T` does.
+    static void RefMutSameLifetime()
+    {
+        var longLived = new List<int> { 1 };
+        var other = new List<int> { 1, 2 };
+        mut Ref<List<int>> keep = Ref<List<int>>.Of(in longLived);
+        AssignSame(RefMut<Ref<List<int>>>.Of(ref keep), Ref<List<int>>.Of(in other));
+        Console.WriteLine(keep.Value.Count); // error: CS9910
+    }
+
+    static void RefField()
+    {
+        var longLived = new List<int> { 1 };
+        mut Ref<List<int>> keep = Ref<List<int>>.Of(in longLived);
+        {
+            var shortLived = new List<int> { 1, 2, 3 };
+            AssignView(new MutView<'_, Ref<List<int>>>(ref keep), Ref<List<int>>.Of(in shortLived)); // error: CS9912
+        }
+        Console.WriteLine(keep.Value.Count);
+    }
+
+    static void ThroughUnsafeCell()
+    {
+        var longLived = new List<int> { 1 };
+        var cell = new MyCell<Ref<List<int>>>(Ref<List<int>>.Of(in longLived));
+        {
+            var shortLived = new List<int> { 1, 2, 3 };
+            Put(in cell, Ref<List<int>>.Of(in shortLived)); // error: CS9912
+        }
+        Console.WriteLine(cell.Peek().Value.Count);
+    }
+
+    static void Main() { }
+}

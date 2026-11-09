@@ -1,0 +1,42 @@
+// What variance allows, as in Rust: Ref and collections are covariant, and &'a mut &'b T with two lifetimes
+// ends the borrow with the call.
+using System;
+using System.Collections.Generic;
+
+class Stack<T> { List<T> _items = new List<T>(); public void Push(T x) { _items.Add(x); } public readonly int Count => _items.Count; }
+
+class MyCell<T>
+{
+    UnsafeCell<T> _v;
+    public MyCell(T x) { _v = new UnsafeCell<T>(x); }
+    public readonly unsafe void Set(T x) { *_v.Get() = x; }
+    public readonly unsafe ref readonly T Peek() => ref *_v.Get();
+}
+
+class P
+{
+    static void Assign<'a, 'b>(RefMut<'a, Ref<'b, List<int>>> m, Ref<'b, List<int>> s) { m.Value = s; }
+    static int Both<'a>(Ref<'a, int> x, Ref<'a, int> y) => x.Value + y.Value;
+    static int Count<'a>(in Stack<Ref<'a, int>> s, Ref<'a, int> extra) => s.Count + extra.Value;
+    static void Put<'a>(in MyCell<Ref<'a, List<int>>> c, Ref<'a, List<int>> r) { c.Set(r); }
+
+    static void Main()
+    {
+        var longLived = new List<int> { 1 };
+        var other = new List<int> { 1, 2 };
+        mut Ref<List<int>> keep = Ref<List<int>>.Of(in longLived);
+        Assign(RefMut<Ref<List<int>>>.Of(ref keep), Ref<List<int>>.Of(in other));
+        Console.WriteLine(keep.Value.Count);
+
+        int a = 1;
+        { int b = 2; Console.WriteLine(Both(Ref<int>.Of(in a), Ref<int>.Of(in b))); }
+
+        mut var s = new Stack<Ref<int>>();
+        s.Push(Ref<int>.Of(in a));
+        { int b = 2; Console.WriteLine(Count(in s, Ref<int>.Of(in b))); }
+
+        var cell = new MyCell<Ref<List<int>>>(Ref<List<int>>.Of(in longLived));
+        Put(in cell, Ref<List<int>>.Of(in other));
+        Console.WriteLine(cell.Peek().Value.Count);
+    }
+}

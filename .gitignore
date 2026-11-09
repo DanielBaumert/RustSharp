@@ -209,3 +209,6 @@ $RECYCLE.BIN/
 
 # WPF temp projects
 *wpftmp.*
+
+# Python caches of the probe suites
+__pycache__/

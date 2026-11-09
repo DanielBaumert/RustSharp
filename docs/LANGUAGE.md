@@ -286,7 +286,36 @@ static T Id<T>(T x) => x;              // the result lives as long as x
 - The core library's generic types keep their own rules (`[CarriesBorrows]`), with the same effect for
   `List<T>`, `Option<T>` and the others.
 
-Not yet: variance beyond what the rules above imply.
+### Variance
+
+As in Rust, a type's variance in each of its lifetimes and type parameters follows from its fields, with
+no annotations:
+
+| Field or type | Variance |
+|---|---|
+| `Ref<'a, T>`, `ref readonly 'a T`, `T`, `T[]`, `List<T>` and the other collections | covariant: a longer-lived value may stand in for a shorter one |
+| `RefMut<'a, T>`, `ref 'a T` | covariant in `'a`, **invariant** in `T`, as Rust's `&'a mut T` |
+| `UnsafeCell<T>`, a raw pointer `T*` | invariant |
+| a delegate, an interface | invariant in what it mentions, as Rust's `dyn Fn` and `dyn Trait` |
+
+Invariance is what keeps a shorter-lived value from being written where a longer-lived one is expected:
+
+```csharp
+static void Assign<'a, 'b>(RefMut<'a, Ref<'b, int>> m, Ref<'b, int> s) { m.Value = s; }
+
+mut Ref<int> keep = Ref<int>.Of(in a);
+{ int b = 2; Assign(RefMut<Ref<int>>.Of(ref keep), Ref<int>.Of(in b)); }   // CS9912: b is too short for keep
+```
+
+With one lifetime for both, `RefMut<'a, Ref<'a, int>>`, `keep` stays borrowed for all of `'a`, so using it
+afterwards is `CS9910`, as Rust rejects `&'a mut &'a T`. A written lifetime on a reference parameter whose
+referent spells out its own lifetimes (`ref 'a T t`) names the borrow, as `&'a mut T` does in Rust; T's
+data lives for T's lifetime, and T outlives the borrow.
+
+A type that changes a value behind a shared reference must keep it in an `UnsafeCell<T>`, Rust's
+`UnsafeCell`: `Get()` gives a pointer to it, and the type becomes invariant in `T`. Other core-library types
+without slots (`Rc`, `Arc`, `Mutex`, `Box`) count as invariant, which is stricter than Rust for `Rc`, `Arc`
+and `Box`, never unsound.
 
 ### Ref structs
 
@@ -842,8 +871,10 @@ If an iterator or task is dropped early, its destructors run. Cleanup belongs in
 
 ## unsafe
 
-In `unsafe` code, raw pointers are allowed, and borrows through them are not checked. `unsafe` is also
-required for:
+In `unsafe` code, raw pointers are allowed, and borrows through them are not checked: writing a value
+through a raw pointer (`*cell.Get() = x`) needs no `'static`, and the code that does it answers for it, as
+in Rust. Changing a value behind a shared reference this way must go through an `UnsafeCell<T>`, so that
+the type stays invariant. `unsafe` is also required for:
 
 - accessing mutable `static` fields (CS9921), because any thread can change the field
 - `Mem.Transmute` (CS9921)

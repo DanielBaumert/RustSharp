@@ -1,0 +1,17 @@
+namespace System
+{
+    /// <summary>
+    /// Rust's UnsafeCell: the one sanctioned way to change a value behind a shared reference. A type that
+    /// holds one is invariant in T, so a shared borrow of it can never take a shorter-lived value in.
+    /// Changing the value through any other pointer while it is shared breaks that guarantee.
+    /// </summary>
+    [CarriesBorrows]
+    public unsafe struct UnsafeCell<T>
+    {
+        private T _value;
+        public UnsafeCell(T value) { _value = value; }
+
+        /// <summary>A pointer to the value, also through a shared reference: Rust's UnsafeCell::get.</summary>
+        public readonly T* Get() => Mem.AddressOf(in _value);
+    }
+}
