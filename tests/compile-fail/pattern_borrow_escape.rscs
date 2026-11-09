@@ -1,0 +1,43 @@
+// A borrow taken out of an Option by the pattern Some(var w) lives no longer than what it borrows.
+// Before the fix, Deconstruct's `out T` left w unbound: the kept reference read a dropped list.
+using System;
+using System.Collections.Generic;
+
+class P
+{
+    static void RefOutOfScope()
+    {
+        mut var keep = new List<Ref<List<int>>>();
+        {
+            var inner = new List<int> { 1, 2, 3 };
+            Option<Ref<List<int>>> o = Option<Ref<List<int>>>.Some(Ref<List<int>>.Of(in inner)); // error: CS9912
+            if (o is Some(var w)) keep.Add(w);
+        }
+        Console.WriteLine(keep.Count);
+    }
+
+    static void StrOutOfScope()
+    {
+        mut var words = new List<str>();
+        {
+            var text = "one two".Clone();
+            str s = text; // error: CS9912
+            Option<str> o = Some(s);
+            if (o is Some(var w)) words.Add(w);
+        }
+        Console.WriteLine(words.Count);
+    }
+
+    static void ChangedWhileKept()
+    {
+        mut var list = new List<int> { 1 };
+        Option<Ref<List<int>>> o = Option<Ref<List<int>>>.Some(Ref<List<int>>.Of(in list));
+        if (o is Some(var w))
+        {
+            list.Add(2); // error: CS9909
+            Console.WriteLine(w.Value.Count);
+        }
+    }
+
+    static void Main() { }
+}

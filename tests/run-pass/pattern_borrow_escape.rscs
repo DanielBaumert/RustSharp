@@ -1,0 +1,22 @@
+// What stays allowed next to compile-fail/pattern_borrow_escape: borrows out of Some(var w) used and kept
+// while what they borrow lives.
+using System;
+using System.Collections.Generic;
+
+class P
+{
+    static void Main()
+    {
+        var list = new List<int> { 1, 2, 3 };
+        mut var keep = new List<Ref<List<int>>>();
+        {
+            Option<Ref<List<int>>> o = Some(Ref<List<int>>.Of(in list));
+            if (o is Some(var w)) keep.Add(w);
+        }
+        Console.WriteLine(keep[0].Value.Count);
+
+        var text = "one two".Clone();
+        Option<str> first = Some(text.Slice(0, 3));
+        if (first is Some(var word)) Console.WriteLine(word);
+    }
+}
