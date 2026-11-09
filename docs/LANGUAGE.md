@@ -453,6 +453,20 @@ A lambda may return a borrow of what it captures or of the data behind its argum
 included: the result lives no longer than the arguments and the captures, and the result of a `[Mut]`
 delegate keeps the delegate borrowed, so it cannot be called again while the result is used (`CS9911`).
 
+A delegate type may declare lifetimes, like Rust's `for<'a> Fn(&'a i32) -> &'a i32`. They belong to each
+call, and the signature says where the result comes from, so callers bind it to that argument only:
+
+```csharp
+delegate Ref<'a, int> Id<'a>(Ref<'a, int> x);
+
+Id id = x => x;
+var r = id(Ref<int>.Of(in y));   // lives as long as y, also after id is gone
+```
+
+Every body behind such a delegate must keep the promise: a lambda that returns something else, such as
+its object's field (`x => R`), is `CS9915`, and so is a method group whose result comes from another
+parameter (`First f = Right;`).
+
 ## LINQ
 
 LINQ works directly on lists and arrays, also in query syntax. It is lazy and monomorphized, and it

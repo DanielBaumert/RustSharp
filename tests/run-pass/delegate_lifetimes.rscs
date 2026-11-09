@@ -1,0 +1,41 @@
+// Delegate types that declare lifetimes, like Rust's for<'a> Fn(&'a i32) -> &'a i32: the signature says
+// where the result comes from, so a caller binds it to that argument only, not to the delegate.
+using System;
+
+delegate Ref<'a, int> Id<'a>(Ref<'a, int> x);
+delegate Ref<'a, int> First<'a, 'b>(Ref<'a, int> x, Ref<'b, int> y);
+
+class Keeper { public static readonly int G = 3; }
+
+class P
+{
+    static Ref<int> Same(Ref<int> x) => x;
+    static Ref<'a, int> Left<'a, 'b>(Ref<'a, int> x, Ref<'b, int> y) => x;
+
+    static void Main()
+    {
+        int y = 1;
+        mut Option<Ref<int>> keep = None;
+        {
+            Id id = x => x;
+            keep = Some(id(Ref<int>.Of(in y)));   // outlives id: it comes from y
+        }
+        Console.WriteLine(keep.Unwrap().Value);
+
+        Id viaMethod = Same;
+        Console.WriteLine(viaMethod(Ref<int>.Of(in y)).Value + 1);
+
+        Id fromStatic = x => Ref<int>.Of(in Keeper.G);   // a 'static borrow outlives any 'a
+        Console.WriteLine(fromStatic(Ref<int>.Of(in y)).Value);
+
+        // Bound to x only: y's referent may end first.
+        int a = 10;
+        mut Option<Ref<int>> left = None;
+        {
+            int b = 20;
+            First f = Left;
+            left = Some(f(Ref<int>.Of(in a), Ref<int>.Of(in b)));
+        }
+        Console.WriteLine(left.Unwrap().Value);
+    }
+}

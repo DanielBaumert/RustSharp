@@ -1,0 +1,37 @@
+// A delegate type that declares lifetimes binds the result to the argument it names, so every body
+// converted to it must keep that promise: a lambda, and a method group.
+using System;
+
+delegate Ref<'a, int> Id<'a>(Ref<'a, int> x);
+delegate Ref<'a, int> First<'a, 'b>(Ref<'a, int> x, Ref<'b, int> y);
+
+// The lambda returns the object's own field ('b), not its argument ('a).
+class Holder<'b>
+{
+    public Ref<'b, int> R;
+    public Holder(Ref<'b, int> r) { R = r; }
+    public readonly Id Make() => x => R; // error: CS9915
+}
+
+class P
+{
+    static Ref<'b, int> Right<'a, 'b>(Ref<'a, int> x, Ref<'b, int> y) => y;
+
+    static void OutlivesArgument()
+    {
+        Id id = x => x;
+        mut Option<Ref<int>> keep = None;
+        {
+            int inner = 1;
+            keep = Some(id(Ref<int>.Of(in inner))); // error: CS9912
+        }
+        Console.WriteLine(keep.Unwrap().Value);
+    }
+
+    static void WrongMethod()
+    {
+        First f = Right; // error: CS9915
+    }
+
+    static void Main() { }
+}
