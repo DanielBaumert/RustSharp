@@ -1,0 +1,38 @@
+// str<'a> is Rust's &'a str: a slice named 'a must come from 'a, and lives no longer than its text.
+using System;
+using System.Collections.Generic;
+
+ref struct Parser<'a>
+{
+    public str<'a> Rest;
+    public Parser(str<'a> text) { Rest = text; }
+    public Option<str<'a>> Word() { var w = Rest; Rest = Rest.Slice(0, 0); return Some(w); }
+}
+
+class P
+{
+    static str<'a> FirstOf<'a, 'b>(str<'a> x, str<'b> y) => x;
+    static str<'a> Wrong<'a, 'b>(str<'a> x, str<'b> y) => y; // error: CS9915
+
+    static void KeepsFirstText()
+    {
+        mut var a = "hello".Clone();
+        var b = "hi".Clone();
+        var r = FirstOf(a, b);
+        a.Push('!'); // error: CS9909
+        Console.WriteLine(r);
+    }
+
+    static void WordsOutliveText()
+    {
+        mut var words = new List<str>();
+        {
+            var text = "one two".Clone();
+            mut var p = new Parser(text); // error: CS9912
+            while (p.Word() is Some(var w)) words.Add(w);
+        }
+        Console.WriteLine(words.Count);
+    }
+
+    static void Main() { }
+}

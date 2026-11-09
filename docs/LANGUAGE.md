@@ -86,6 +86,15 @@ the text and the separator.
 static str FirstWord(str s) => s.IndexOf(" ") is var i && i >= 0 ? s.Slice(0, i) : s;
 ```
 
+`str` takes a lifetime like Rust's `&'a str`, so a signature or a struct can say which text a slice
+borrows:
+
+```csharp
+static str<'a> Longest<'a>(str<'a> x, str<'a> y) => x.Length >= y.Length ? x : y;
+
+ref struct Parser<'a> { public str<'a> Rest; /* Word() returns str<'a>: words outlive the parser */ }
+```
+
 A method that only reads takes `in string` (Rust's `&str`). Core-library methods with a `string`
 parameter, `a + b`, `==`, `$"…"` and `switch` only read and consume nothing.
 
@@ -248,7 +257,7 @@ a = 5;                       // CS9907 while idx is used
   Rust's drop check: an object declared before what it borrows is `CS9912`.
 - A field without a lifetime can only hold `'static` borrows, as before.
 
-Not yet: variance beyond what the rules above imply, `where T : 'a`, and `str<'a>`.
+Not yet: variance beyond what the rules above imply, and `where T : 'a`.
 
 ### Ref structs
 

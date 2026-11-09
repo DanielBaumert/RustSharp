@@ -171,8 +171,8 @@ general performance claims.
 - `dynamic`, general reflection, and arbitrary-object `lock` are unsupported.
 - There is no `null`, neither in user code nor in the core library; use `Option<T>` for optional values.
   Only raw pointers in `unsafe` code may be null, as with Rust's `ptr::null`.
-- Lifetime parameters exist for ref structs, classes, structs and `Ref<'a, T>`/`RefMut<'a, T>`, not yet
-  for `str`. A variable that a lambda captures cannot hold borrows unless they are `'static`.
+- Lifetime parameters exist for ref structs, classes, structs, delegates, `Ref<'a, T>`/`RefMut<'a, T>` and
+  `str<'a>`. A variable that a lambda captures cannot hold borrows unless they are `'static`.
 - Tasks are lazy, like Rust futures, rather than automatically starting like
   ordinary C# tasks.
 - The runtime uses a single reactor thread; file I/O runs on dedicated threads.

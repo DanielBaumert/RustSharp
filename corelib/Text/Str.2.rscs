@@ -1,7 +1,7 @@
 namespace System
 {
     /// <summary>Rust's &amp;str methods. Those that cut return a str into the same bytes.</summary>
-    public readonly unsafe partial struct str
+    public readonly unsafe partial struct str<'a>
     {
         private static bool Space(byte b) => b == ' ' || (b >= 9 && b <= 13);
 

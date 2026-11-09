@@ -5,7 +5,7 @@ namespace System
     /// turns into one implicitly; a literal becomes a 'static str on the program's own bytes.
     /// </summary>
     [Reference]
-    public readonly unsafe partial struct str
+    public readonly unsafe partial struct str<'a>
     {
         private readonly byte* _p;
         private readonly int _length;

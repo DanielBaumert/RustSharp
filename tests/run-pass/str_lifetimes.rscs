@@ -1,0 +1,50 @@
+// str<'a> is Rust's &'a str: functions and structs say which text a slice borrows.
+using System;
+using System.Collections.Generic;
+
+// Rust: struct Parser<'a> { rest: &'a str } -- the words borrow the text, not the parser.
+ref struct Parser<'a>
+{
+    public str<'a> Rest;
+    public Parser(str<'a> text) { Rest = text; }
+    public Option<str<'a>> Word()
+    {
+        if (Rest.IsEmpty) return None;
+        int i = Rest.IndexOf(" ");
+        if (i < 0) { var last = Rest; Rest = Rest.Slice(0, 0); return Some(last); }
+        var word = Rest.Slice(0, i);
+        Rest = Rest.Slice(i + 1, Rest.Length - i - 1);
+        return Some(word);
+    }
+}
+
+class P
+{
+    // Rust: fn longest<'a>(x: &'a str, y: &'a str) -> &'a str
+    static str<'a> Longest<'a>(str<'a> x, str<'a> y) => x.Length >= y.Length ? x : y;
+    static str<'a> FirstOf<'a, 'b>(str<'a> x, str<'b> y) => x;
+
+    static void Main()
+    {
+        var a = "hello world".Clone();
+        var b = "hi".Clone();
+        Console.WriteLine(Longest(a, b));
+
+        // Bound to the first text only: the second may end first.
+        mut Option<str> kept = None;
+        {
+            var shortLived = "temporary".Clone();
+            kept = Some(FirstOf(a, shortLived));
+        }
+        Console.WriteLine(kept.Unwrap());
+
+        // Words outlive the parser that produced them.
+        var text = "one two three".Clone();
+        mut var words = new List<str>();
+        {
+            mut var p = new Parser(text);
+            while (p.Word() is Some(var w)) words.Add(w);
+        }
+        Console.WriteLine(words.Count + " " + words.At(2));
+    }
+}
