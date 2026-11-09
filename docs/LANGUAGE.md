@@ -275,7 +275,9 @@ static T Id<T>(T x) => x;              // the result lives as long as x
 
 - A body may not store a `T` where no lifetime is tracked, such as a static, a thread or an object
   without lifetimes, unless the method says `where T : 'static` (`CS9915`). Its callers then have to
-  pass `'static` values. `where T : 'a` relates `T` to a named lifetime.
+  pass `'static` values. `where T : 'a` relates `T` to a named lifetime. On a type
+  (`class Registry<T> where T : 'static`), the clause holds in all its methods, as does
+  `where 'a : 'b` on a type with lifetime parameters.
 - A trait bound `where T : IStore<U>` lets `T` hold `U`, so `U` must outlive `T` at every call, as
   Rust's implementation would require.
 - Each type parameter has one lifetime. A value with several lifetimes, such as `HP<'a, 'b>`, keeps

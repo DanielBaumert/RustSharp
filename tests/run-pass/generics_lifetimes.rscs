@@ -17,6 +17,17 @@ class Acc<V> : IStore<V> { public List<V> Items = new List<V>(); public void Sto
 class Static<T> { public static Option<T> Slot = None; }
 class G { public static readonly int V = 7; }
 
+// A bound on the type holds in all its methods: Rust's struct Registry<T: 'static>.
+class Registry<T> where T : 'static { public void Add(T x) { unsafe { Static<T>.Slot = Some(x); } } }
+
+// `where 'a : 'b` on a type: X may be lent out for the shorter 'b.
+ref struct Longer<'a, 'b> where 'a : 'b
+{
+    public ref readonly 'a int X;
+    public Longer(ref readonly 'a int x) { X = ref x; }
+    public readonly ref readonly 'b int AsShorter() => ref X;
+}
+
 class P
 {
     static T Id<T>(T x) => x;
@@ -46,5 +57,10 @@ class P
 
         Keep(Ref<int>.Of(in G.V));                       // where T : 'static, given a 'static borrow
         unsafe { Console.WriteLine(Static<Ref<int>>.Slot.IsSome); }
+
+        mut var registry = new Registry<Ref<int>>();
+        registry.Add(Ref<int>.Of(in G.V));
+        var longer = new Longer<'_, '_>(in a);
+        Console.WriteLine(longer.AsShorter() + 1);
     }
 }

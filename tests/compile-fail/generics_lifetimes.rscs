@@ -18,6 +18,7 @@ class Acc<V> : IStore<V> { public List<V> Items = new List<V>(); public void Sto
 class Static<T> { public static Option<T> Slot = None; }
 class Leak<T> { public static Option<T> Slot = None; public void Put(T x) { unsafe { Slot = Some(x); } } } // error: CS9915
 class HP<'a, 'b> { public Ref<'a, int> X; public Ref<'b, int> Y; public HP(Ref<'a, int> x, Ref<'b, int> y) { X = x; Y = y; } }
+class Registry<T> where T : 'static { public void Add(T x) { unsafe { Static<T>.Slot = Some(x); } } }
 class Wrapper<T, U> where T : IStore<U> { T _inner; public Wrapper(T i) { _inner = i; } public void Put(U u) { _inner.Store(u); } public readonly int Count() => 0; }
 
 class P
@@ -49,6 +50,7 @@ class P
     static void BoundOutlives() { mut var acc = new Acc<Ref<int>>(); { int x = 1; Fill(ref acc, Ref<int>.Of(in x)); } Console.WriteLine(acc.Items.Count); } // error: CS9912
     static void TypeBoundOutlives() { mut var w = new Wrapper<Acc<Ref<int>>, Ref<int>>(new Acc<Ref<int>>()); { int a = 1; w.Put(Ref<int>.Of(in a)); } Console.WriteLine(w.Count()); } // error: CS9912
     static void SlotsThroughT() { mut int a = 1; int b = 2; var h = Id(new HP(Ref<int>.Of(in a), Ref<int>.Of(in b))); var r = FirstOf(in h); a = 5; Console.WriteLine(r.Value); } // error: CS9907
+    static void TypeBoundStatic() { int a = 1; mut var r = new Registry<Ref<int>>(); r.Add(Ref<int>.Of(in a)); } // error: CS9914
     static void ToThread() { int a = 1; mut var s = new Stack<Ref<int>>(); s.Push(Ref<int>.Of(in a)); var t = Thread.Run(move () => s.Count); } // error: CS9914
 
     static void Main() { }
