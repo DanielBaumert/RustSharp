@@ -16,6 +16,7 @@ namespace System
 
     public static class Activator { public static extern T CreateInstance<T>(); }
 
+    [CarriesBorrows]
     public struct ValueTuple<T1, T2>
     {
         public T1 Item1;
@@ -23,6 +24,7 @@ namespace System
         public ValueTuple(T1 a, T2 b) { Item1 = a; Item2 = b; }
     }
 
+    [CarriesBorrows]
     public struct ValueTuple<T1, T2, T3>
     {
         public T1 Item1;
@@ -31,6 +33,7 @@ namespace System
         public ValueTuple(T1 a, T2 b, T3 c) { Item1 = a; Item2 = b; Item3 = c; }
     }
 
+    [CarriesBorrows]
     public struct ValueTuple<T1, T2, T3, T4>
     {
         public T1 Item1;

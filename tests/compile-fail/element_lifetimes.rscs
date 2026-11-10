@@ -1,0 +1,56 @@
+// A container keeps each lifetime of its element apart, as Rust's types do: a RefMut to an element
+// (AsMut, GetMut) is invariant in what the element borrows, and a field of an element lives for its own lifetime.
+using System;
+using System.Collections.Generic;
+
+struct Pair<'a, 'b> { public Ref<'a, int> A; public Ref<'b, int> B; public Pair(Ref<'a, int> a, Ref<'b, int> b) { A = a; B = b; } }
+class Box1<T> { public T V; public Box1(T v) { V = v; } }
+
+class P
+{
+    static void ViaOption()
+    {
+        var longLived = new List<int> { 1 };
+        mut Option<Ref<List<int>>> o = Some(Ref<List<int>>.Of(in longLived));
+        {
+            var shortLived = new List<int> { 2 };
+            o.AsMut().Unwrap().Value = Ref<List<int>>.Of(in shortLived); // error: CS9912
+        }
+        Console.WriteLine(o.Unwrap().Value.Count);
+    }
+
+    static void ViaList()
+    {
+        var longLived = new List<int> { 1 };
+        mut var l = new List<Ref<List<int>>> { Ref<List<int>>.Of(in longLived) };
+        {
+            var shortLived = new List<int> { 2 };
+            l.GetMut(0).Unwrap().Value = Ref<List<int>>.Of(in shortLived); // error: CS9912
+        }
+        Console.WriteLine(l.At(0).Value.Count);
+    }
+
+    static void Put<'b>(Option<RefMut<Ref<'b, int>>> o, Ref<'b, int> r) { mut var m = o.Unwrap(); m.Value = r; }
+
+    static void ThroughParameter()
+    {
+        int longLived = 1;
+        mut Ref<int> keep = Ref<int>.Of(in longLived);
+        { int shortLived = 2; Put(Some(RefMut<Ref<int>>.Of(ref keep)), Ref<int>.Of(in shortLived)); } // error: CS9912
+        Console.WriteLine(keep.Value);
+    }
+
+    static void FieldOfElement()
+    {
+        int a = 1;
+        Ref<int> keepB;
+        {
+            int b = 2;
+            var box = new Box1<Pair>(new Pair(Ref<int>.Of(in a), Ref<int>.Of(in b))); // error: CS9912
+            keepB = box.V.B;
+        }
+        Console.WriteLine(keepB.Value);
+    }
+
+    static void Main() { ViaOption(); ViaList(); ThroughParameter(); FieldOfElement(); }
+}

@@ -280,11 +280,29 @@ static T Id<T>(T x) => x;              // the result lives as long as x
   `where 'a : 'b` on a type with lifetime parameters.
 - A trait bound `where T : IStore<U>` lets `T` hold `U`, so `U` must outlive `T` at every call, as
   Rust's implementation would require.
-- Each type parameter has one lifetime. A value with several lifetimes, such as `HP<'a, 'b>`, keeps
-  them apart in its own type, but passed as a `T` they act as one, the shorter. That is stricter than
-  Rust, never unsound.
-- The core library's generic types keep their own rules (`[CarriesBorrows]`), with the same effect for
-  `List<T>`, `Option<T>` and the others.
+- Inside a generic body, `T` has one lifetime, as in Rust, where `T: 'x` is all a body knows. Outside,
+  each lifetime position of a type is its own region, as Rust substitutes `T`: `Box<Pair<'a, 'b>>`,
+  `Option<RefMut<'s, Ref<'y, int>>>` and `List<Pair<'a, 'b>>` keep their lifetimes apart, so
+  `box.V.A` lives for `'a` alone, and everywhere `T` appears in a signature it names the same regions of
+  the argument (`Id(pair)` gives back both lifetimes unchanged).
+- The core library's generic types (`[CarriesBorrows]`: `List<T>`, `Option<T>` and the others) have no
+  lifetime of their own; their element's lifetimes unfold into them the same way.
+
+### Tuples
+
+A tuple holds borrows, each element for its own lifetime, as Rust's `(&'a i32, &'b i32)`:
+
+```csharp
+mut Ref<int> keep = Ref<int>.Of(in a);
+{
+    int b = 2;
+    var pair = (Ref<int>.Of(in a), Ref<int>.Of(in b));
+    keep = pair.Item1;   // fine: Item1 lives for a
+    keep = pair.Item2;   // CS9912: b does not live long enough
+}
+```
+
+`mut` before a tuple type (`mut (Ref<int>, int) k`) does not parse yet; write `mut var k = (…)`.
 
 ### Variance
 
@@ -297,6 +315,15 @@ no annotations:
 | `RefMut<'a, T>`, `ref 'a T` | covariant in `'a`, **invariant** in `T`, as Rust's `&'a mut T` |
 | `UnsafeCell<T>`, a raw pointer `T*` | invariant |
 | a delegate, an interface | invariant in what it mentions, as Rust's `dyn Fn` and `dyn Trait` |
+
+Variance composes along the type: in `Option<RefMut<'s, Ref<'y, int>>>`, `'s` is covariant and `'y`
+invariant, so a `RefMut` to an element (`o.AsMut()`, `l.GetMut(i)`) cannot store a shorter-lived
+reference into the container, while the borrow of the container itself may end early (CS9912):
+
+```csharp
+mut Option<Ref<List<int>>> o = Some(Ref<List<int>>.Of(in longLived));
+{ var b = new List<int>(); o.AsMut().Unwrap().Value = Ref<List<int>>.Of(in b); }   // CS9912
+```
 
 Invariance is what keeps a shorter-lived value from being written where a longer-lived one is expected:
 
@@ -451,6 +478,13 @@ class Shape : IClone<Shape> { public readonly Shape Clone() => ...; }   // a cus
 ```
 
 A type without Clone gives `CS9922`. The dynamic type is always cloned, even behind an interface.
+
+A clone owns its value, as Rust's `fn clone(&self) -> Self`: it carries the lifetimes of what it copies,
+not the borrow taken to copy it, so `(x.Clone(), x)` is fine.
+
+Not yet as in Rust: `int`, `string`, `bool`, `char`, `Option`, `Result`, tuples and most collections do not
+implement `IClone<T>`, `IEq<T>`, `IOrd<T>` or `IHash` yet, so a bound such as `where T : IClone<T>` excludes
+them (`x.Clone()` itself works). `Option<T>` is not `IDefault`, so `Mem.Take(ref opt)` needs `opt.Take()`.
 
 ## Records
 

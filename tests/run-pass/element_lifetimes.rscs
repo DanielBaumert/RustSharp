@@ -1,0 +1,41 @@
+// The lifetimes of an element stay apart: storing a reference that lives long enough through AsMut/GetMut
+// is fine, and a field of an element lives for its own lifetime, not the shortest one in the element.
+using System;
+using System.Collections.Generic;
+
+struct Pair<'a, 'b> { public Ref<'a, int> A; public Ref<'b, int> B; public Pair(Ref<'a, int> a, Ref<'b, int> b) { A = a; B = b; } }
+class Box1<T> { public T V; public Box1(T v) { V = v; } }
+
+class P
+{
+    static void Main()
+    {
+        var longLived = new List<int> { 1 };
+        var other = new List<int> { 2, 3 };
+        mut Option<Ref<List<int>>> o = Some(Ref<List<int>>.Of(in longLived));
+        o.AsMut().Unwrap().Value = Ref<List<int>>.Of(in other);
+        Console.WriteLine(o.Unwrap().Value.Count);
+
+        mut var l = new List<Ref<List<int>>> { Ref<List<int>>.Of(in longLived) };
+        l.GetMut(0).Unwrap().Value = Ref<List<int>>.Of(in other);
+        Console.WriteLine(l.At(0).Value.Count);
+
+        // The borrow of the Option ends before the element's referent is read again.
+        mut Option<Ref<List<int>>> p = Some(Ref<List<int>>.Of(in longLived));
+        var m = p.AsMut().Unwrap();
+        Console.WriteLine(m.Value.Value.Count);
+        Console.WriteLine(p.Unwrap().Value.Count);
+
+        int a = 10;
+        mut Ref<int> keepA;
+        {
+            int b = 20;
+            var box = new Box1<Pair>(new Pair(Ref<int>.Of(in a), Ref<int>.Of(in b)));
+            Console.WriteLine(box.V.B.Value);
+            keepA = box.V.A;
+            var q = Some(new Pair(Ref<int>.Of(in a), Ref<int>.Of(in b)));
+            keepA = q.Unwrap().A;
+        }
+        Console.WriteLine(keepA.Value);
+    }
+}

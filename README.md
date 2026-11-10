@@ -136,6 +136,9 @@ Source
   -> native ELF binary
 ```
 
+The target architecture, RustSharp's own frontend without Roslyn, and the migration steps toward it are in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 The main RustSharp implementation is under
 `roslyn/src/Compilers/CSharp/Portable/Ownership/`:
 

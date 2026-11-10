@@ -80,6 +80,7 @@ static void T1() { mut int a = 1; int b = 2; var h = Id(new HP(Ref<int>.Of(in a)
 case('rej_bound_concrete', 'reject', '''static void G<T>(ref T a, Ref<int> r) where T : IStore<Ref<int>> { a.Store(r); }''')
 case('rej_type_level_static', 'reject', '''static void T1() { int a = 1; mut var r = new Registry<Ref<int>>(); r.Add(Ref<int>.Of(in a)); }''', pre="class Registry<T> where T : 'static { public void Add(T x) { unsafe { Static<T>.Slot = Some(x); } } }\n")
 # One lifetime per type parameter: Rust keeps 'a and 'b apart through a T, RustSharp merges them.
-case('strict_slots_through_T', 'strict', '''static T Id<T>(T x) => x;
+# Through T each lifetime stays its own, as Rust substitutes T (structured lifetimes).
+case('slots_through_T', 'ok', '''static T Id<T>(T x) => x;
 static Ref<'a, int> FirstOf<'a, 'b>(in HP<'a, 'b> p) => p.X;
 static void T1() { int a = 1; mut int b = 2; var h = Id(new HP(Ref<int>.Of(in a), Ref<int>.Of(in b))); var r = FirstOf(in h); b = 5; Console.WriteLine(r.Value); }''', pre=HP)

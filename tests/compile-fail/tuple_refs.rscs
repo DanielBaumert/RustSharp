@@ -1,0 +1,31 @@
+// Each element of a tuple keeps its own lifetime: the shorter one is not given to the other, and a
+// tuple does not outlive what it borrows.
+using System;
+
+class P
+{
+    static void ItemTooShort()
+    {
+        int a = 1;
+        mut Ref<int> keep = Ref<int>.Of(in a);
+        {
+            int b = 2;
+            var pair = (Ref<int>.Of(in a), Ref<int>.Of(in b)); // error: CS9912
+            keep = pair.Item2;
+        }
+        Console.WriteLine(keep.Value);
+    }
+
+    static void TupleOutlives()
+    {
+        int z = 0;
+        mut var k = (Ref<int>.Of(in z), 0);
+        {
+            int a = 1;
+            k = (Ref<int>.Of(in a), 1); // error: CS9912
+        }
+        Console.WriteLine(k.Item1.Value);
+    }
+
+    static void Main() { ItemTooShort(); TupleOutlives(); }
+}

@@ -13,7 +13,12 @@ class Suite:
 
     def case(self, name, expect, body, pre=''):
         assert expect in ('ok', 'reject', 'strict'), expect
-        self.cases[name] = (expect, self.header + pre + 'class P {\n' + body + '\n    static void Main() { }\n}\n')
+        # Main calls the case: some checks (Send, Sync) run only on code that is generated, as with Rust's
+        # monomorphization, so a case that is never called would pass unchecked.
+        if 'async Task T1(' in body: main = '    static async Task Main() { await T1(); }\n'
+        elif 'void T1(' in body: main = '    static void Main() { T1(); }\n'
+        else: main = '    static void Main() { }\n'
+        self.cases[name] = (expect, self.header + pre + 'class P {\n' + body + '\n' + main + '}\n')
 
     def run(self, out, flt='', verbose=False):
         os.makedirs(out, exist_ok=True)

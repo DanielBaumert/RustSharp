@@ -6,7 +6,7 @@ args = [a for a in sys.argv[1:] if a != '-v']
 flt = args[0] if args else ''
 out = tempfile.mkdtemp(prefix='rustsharpprobes')
 total = good = 0
-for mod in ('generics', 'variance'):
+for mod in ('basics', 'generics', 'variance', 'combos', 'parity'):
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), mod + '.py')
     if not os.path.exists(path): continue
     g, t = importlib.import_module(mod).SUITE.run(out, flt, '-v' in sys.argv)

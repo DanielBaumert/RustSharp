@@ -1,0 +1,31 @@
+// Tuples hold borrows as in Rust, each element for its own lifetime, and a clone owns its value.
+using System;
+using System.Collections.Generic;
+
+class P
+{
+    static (Ref<int>, int) WithIndex(Ref<int> x) => (x, 1);
+    static (T, int) Tag<T>(T x) => (x, 7);
+    static (T, T) Dup<T>(T x) where T : IClone<T> => (x.Clone(), x);
+
+    static void Main()
+    {
+        int a = 1;
+        var t = (Ref<int>.Of(in a), 2);
+        Console.WriteLine(t.Item1.Value + t.Item2);
+        Console.WriteLine(WithIndex(Ref<int>.Of(in a)).Item1.Value);
+        Console.WriteLine(Tag(Ref<int>.Of(in a)).Item2);
+
+        mut Ref<int> keep = Ref<int>.Of(in a);
+        {
+            int b = 2;
+            var pair = (Ref<int>.Of(in a), Ref<int>.Of(in b));
+            Console.WriteLine(pair.Item2.Value);
+            keep = pair.Item1;
+        }
+        Console.WriteLine(keep.Value);
+
+        var (x, y) = Dup(new List<int> { 1, 2 });
+        Console.WriteLine(x.Count + y.Count);
+    }
+}

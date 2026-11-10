@@ -2,7 +2,9 @@ using System.Runtime.CompilerServices;
 
 namespace System.Threading.Tasks
 {
-    [BorrowHolder]
+    // [CarriesBorrows]: what GetResult hands out lives for what the task holds, not for this awaiter,
+    // as Rust's `.await` moves the value out of the future.
+    [BorrowHolder, CarriesBorrows]
     public struct TaskAwaiter<T> : INotifyCompletion
     {
         private Option<Task<T>> _task; // taken when GetResult has to block on it
